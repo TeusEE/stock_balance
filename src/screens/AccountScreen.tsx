@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
   Pressable,
@@ -17,6 +17,7 @@ import { PortfolioItem } from '@/types';
 import { colors, colorAt, radius, spacing } from '@/theme';
 import { formatCurrency, formatPercent } from '@/utils/format';
 import { isValidAllocation, sumTargetPercent } from '@/utils/aggregate';
+import { computeAccountRebalance } from '@/utils/rebalance';
 import { fetchQuotes } from '@/services/stockApi';
 
 export const AccountScreen: React.FC = () => {
@@ -73,27 +74,62 @@ export const AccountScreen: React.FC = () => {
   const valid = isValidAllocation(activeAccount.items);
   const remaining = 100 - totalPercent;
 
-  const handleRefreshPrices = async () => {
-    const symbols = activeAccount.items
-      .filter((it) => it.symbol)
-      .map((it) => it.symbol as string);
-    if (symbols.length === 0) return;
-    try {
-      const quotes = await fetchQuotes(symbols);
-      for (const item of activeAccount.items) {
-        if (item.symbol && quotes[item.symbol]) {
-          const q = quotes[item.symbol];
-          updateItem(activeAccount.id, item.id, {
-            currentPrice: q.price,
-            currency: q.currency,
-            lastPriceUpdatedAt: Date.now(),
-          });
+  const rebalance = useMemo(
+    () => computeAccountRebalance(activeAccount),
+    [activeAccount],
+  );
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  const refreshPrices = useCallback(
+    async (silent: boolean) => {
+      const symbols = activeAccount.items
+        .filter((it) => it.symbol)
+        .map((it) => it.symbol as string);
+      if (symbols.length === 0) return;
+      setRefreshing(true);
+      try {
+        const quotes = await fetchQuotes(symbols);
+        for (const item of activeAccount.items) {
+          if (item.symbol && quotes[item.symbol]) {
+            const q = quotes[item.symbol];
+            updateItem(activeAccount.id, item.id, {
+              currentPrice: q.price,
+              currency: q.currency,
+              lastPriceUpdatedAt: Date.now(),
+            });
+          }
         }
+      } catch (e) {
+        if (!silent) {
+          Alert.alert('가격 업데이트 실패', '잠시 후 다시 시도해주세요.');
+        }
+      } finally {
+        setRefreshing(false);
       }
-    } catch (e) {
-      Alert.alert('가격 업데이트 실패', '잠시 후 다시 시도해주세요.');
+    },
+    [activeAccount, updateItem],
+  );
+
+  const handleRefreshPrices = useCallback(() => {
+    refreshPrices(false);
+  }, [refreshPrices]);
+
+  const autoRefreshedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!activeAccount) return;
+    if (autoRefreshedRef.current.has(activeAccount.id)) return;
+    const STALE_MS = 5 * 60 * 1000;
+    const now = Date.now();
+    const hasStale = activeAccount.items.some(
+      (it) =>
+        !!it.symbol && (!it.lastPriceUpdatedAt || now - it.lastPriceUpdatedAt > STALE_MS),
+    );
+    if (hasStale) {
+      autoRefreshedRef.current.add(activeAccount.id);
+      refreshPrices(true);
     }
-  };
+  }, [activeAccount?.id, refreshPrices]);
 
   const handleDeleteAccount = () => {
     Alert.alert('계좌 삭제', `“${activeAccount.name}” 계좌를 삭제할까요?`, [
@@ -200,12 +236,43 @@ export const AccountScreen: React.FC = () => {
                 : `남은 비중: ${formatPercent(remaining, 2)}`}
             </Text>
             {activeAccount.items.some((it) => it.symbol) && (
-              <Pressable style={styles.refreshBtn} onPress={handleRefreshPrices}>
-                <Text style={styles.refreshBtnText}>현재가 새로고침</Text>
+              <Pressable
+                style={styles.refreshBtn}
+                onPress={handleRefreshPrices}
+                disabled={refreshing}
+              >
+                <Text style={styles.refreshBtnText}>
+                  {refreshing ? '갱신 중…' : '현재가 새로고침'}
+                </Text>
               </Pressable>
             )}
           </View>
         </View>
+
+        {activeAccount.items.length > 0 && (
+          <View style={styles.rebalanceCard}>
+            <View style={styles.rebalanceRow}>
+              <Text style={styles.rebalanceLabel}>권장 매수 총액</Text>
+              <Text style={styles.rebalanceValue}>
+                {formatCurrency(rebalance.totalActual, activeAccount.currency)}
+              </Text>
+            </View>
+            <View style={styles.rebalanceRow}>
+              <Text style={styles.rebalanceLabel}>예상 현금 잔액</Text>
+              <Text
+                style={[
+                  styles.rebalanceValue,
+                  { color: rebalance.totalUnallocated >= 0 ? colors.success : colors.danger },
+                ]}
+              >
+                {formatCurrency(rebalance.totalUnallocated, activeAccount.currency)}
+              </Text>
+            </View>
+            <Text style={styles.rebalanceHint}>
+              * 정수 주 단위 매수 기준 — 1주 단위로 내림 계산됩니다.
+            </Text>
+          </View>
+        )}
 
         <View style={styles.itemsHeader}>
           <Text style={styles.sectionTitle}>구성 항목</Text>
@@ -225,9 +292,7 @@ export const AccountScreen: React.FC = () => {
             <Text style={styles.emptyDesc}>아직 항목이 없습니다.</Text>
           </View>
         ) : (
-          activeAccount.items.map((item, i) => {
-            const value =
-              activeAccount.totalAmount * (item.targetPercent / 100);
+          rebalance.items.map(({ item, rebalance: rb }, i) => {
             return (
               <Pressable
                 key={item.id}
@@ -249,21 +314,44 @@ export const AccountScreen: React.FC = () => {
               >
                 <View style={[styles.itemColorDot, { backgroundColor: colorAt(i) }]} />
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.itemName} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Text style={styles.itemSub} numberOfLines={1}>
-                    {item.symbol ? `${item.symbol}` : '직접 입력'}
-                    {item.currentPrice != null
-                      ? `  ·  ${item.currentPrice.toLocaleString()} ${item.currency ?? ''}`
-                      : ''}
-                  </Text>
-                </View>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={styles.itemPercent}>{formatPercent(item.targetPercent)}</Text>
-                  <Text style={styles.itemValue}>
-                    {formatCurrency(value, activeAccount.currency)}
-                  </Text>
+                  <View style={styles.itemHeaderRow}>
+                    <Text style={styles.itemName} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text style={styles.itemPercent}>
+                      {formatPercent(item.targetPercent)}
+                    </Text>
+                  </View>
+                  <View style={styles.itemHeaderRow}>
+                    <Text style={styles.itemSub} numberOfLines={1}>
+                      {item.symbol ? `${item.symbol}` : '직접 입력'}
+                      {item.currentPrice != null
+                        ? `  ·  ${item.currentPrice.toLocaleString()} ${item.currency ?? ''}`
+                        : ''}
+                    </Text>
+                    <Text style={styles.itemValue}>
+                      {formatCurrency(rb.targetValue, activeAccount.currency)}
+                    </Text>
+                  </View>
+                  {rb.hasPrice ? (
+                    <View style={styles.itemRebalanceBox}>
+                      <Text style={styles.itemRebalanceShares}>
+                        권장 매수 {rb.shares.toLocaleString()}주
+                      </Text>
+                      <Text style={styles.itemRebalanceDetail}>
+                        예상 매수금액 {formatCurrency(rb.actualValue, activeAccount.currency)}
+                        {'  ·  '}
+                        {rb.remaining >= 0 ? '부족 ' : '초과 '}
+                        {formatCurrency(Math.abs(rb.remaining), activeAccount.currency)}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.itemRebalanceBox}>
+                      <Text style={styles.itemRebalanceMissing}>
+                        현재가 정보 없음 — 검색하거나 직접 입력하면 권장 매수 수량이 계산됩니다.
+                      </Text>
+                    </View>
+                  )}
                 </View>
               </Pressable>
             );
@@ -372,7 +460,7 @@ const styles = StyleSheet.create({
   addBtnText: { color: '#fff', fontWeight: '700' },
   itemRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     backgroundColor: colors.card,
     borderRadius: radius.md,
     padding: spacing.md,
@@ -380,11 +468,42 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     gap: spacing.md,
   },
-  itemColorDot: { width: 10, height: 10, borderRadius: 5 },
-  itemName: { color: colors.text, fontSize: 15, fontWeight: '600' },
-  itemSub: { color: colors.textDim, fontSize: 12, marginTop: 2 },
+  itemColorDot: { width: 10, height: 10, borderRadius: 5, marginTop: 6 },
+  itemHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  itemName: { color: colors.text, fontSize: 15, fontWeight: '600', flex: 1 },
+  itemSub: { color: colors.textDim, fontSize: 12, marginTop: 2, flex: 1 },
   itemPercent: { color: colors.text, fontSize: 15, fontWeight: '700' },
   itemValue: { color: colors.textDim, fontSize: 12, marginTop: 2 },
+  itemRebalanceBox: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: colors.border,
+  },
+  itemRebalanceShares: { color: colors.primary, fontSize: 14, fontWeight: '700' },
+  itemRebalanceDetail: { color: colors.textDim, fontSize: 12, marginTop: 2 },
+  itemRebalanceMissing: { color: colors.warning, fontSize: 12, fontStyle: 'italic' },
+  rebalanceCard: {
+    backgroundColor: colors.card,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: spacing.sm,
+  },
+  rebalanceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  rebalanceLabel: { color: colors.textDim, fontSize: 14 },
+  rebalanceValue: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  rebalanceHint: { color: colors.textDim, fontSize: 11, marginTop: spacing.xs },
   primaryBtn: {
     marginTop: spacing.lg,
     backgroundColor: colors.primary,

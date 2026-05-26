@@ -29,7 +29,7 @@ export const ItemEditorModal: React.FC<Props> = ({
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState<string | undefined>(undefined);
   const [percent, setPercent] = useState('');
-  const [currentPrice, setCurrentPrice] = useState<number | undefined>(undefined);
+  const [priceInput, setPriceInput] = useState('');
   const [currency, setCurrency] = useState<string | undefined>(undefined);
   const [manual, setManual] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -39,7 +39,7 @@ export const ItemEditorModal: React.FC<Props> = ({
       setName(initial?.name ?? '');
       setSymbol(initial?.symbol);
       setPercent(initial?.targetPercent != null ? String(initial.targetPercent) : '');
-      setCurrentPrice(initial?.currentPrice);
+      setPriceInput(initial?.currentPrice != null ? String(initial.currentPrice) : '');
       setCurrency(initial?.currency);
       setManual(initial?.manual ?? !initial?.symbol);
     }
@@ -48,7 +48,7 @@ export const ItemEditorModal: React.FC<Props> = ({
   const handleSelectStock = (q: StockQuote) => {
     setName(q.longname || q.shortname);
     setSymbol(q.symbol);
-    setCurrentPrice(q.price);
+    setPriceInput(q.price != null ? String(q.price) : '');
     setCurrency(q.currency);
     setManual(false);
   };
@@ -56,14 +56,17 @@ export const ItemEditorModal: React.FC<Props> = ({
   const handleSubmit = () => {
     const pct = parseFloat(percent);
     if (!name.trim() || !isFinite(pct) || pct <= 0) return;
+    const parsedPrice = parseFloat(priceInput);
+    const price =
+      isFinite(parsedPrice) && parsedPrice > 0 ? parsedPrice : undefined;
     onSubmit({
       name: name.trim(),
       symbol,
       targetPercent: pct,
-      currentPrice,
+      currentPrice: price,
       currency,
       manual,
-      lastPriceUpdatedAt: currentPrice ? Date.now() : undefined,
+      lastPriceUpdatedAt: price ? Date.now() : undefined,
     });
     onClose();
   };
@@ -91,8 +94,6 @@ export const ItemEditorModal: React.FC<Props> = ({
                 setName(v);
                 setManual(true);
                 setSymbol(undefined);
-                setCurrentPrice(undefined);
-                setCurrency(undefined);
               }}
               placeholder="직접 입력 또는 검색"
               placeholderTextColor={colors.textDim}
@@ -109,11 +110,41 @@ export const ItemEditorModal: React.FC<Props> = ({
           {symbol ? (
             <Text style={styles.symbolHint}>
               {symbol}
-              {currentPrice != null
-                ? `  ·  현재가 ${currentPrice.toLocaleString()} ${currency ?? ''}`
-                : ''}
+              {currency ? `  ·  ${currency}` : ''}
             </Text>
           ) : null}
+
+          <Text style={styles.label}>
+            현재가 {symbol ? '(검색 시 자동 입력, 수정 가능)' : '(선택)'}
+          </Text>
+          <View style={styles.row}>
+            <TextInput
+              value={priceInput}
+              onChangeText={setPriceInput}
+              placeholder="예: 300"
+              placeholderTextColor={colors.textDim}
+              keyboardType="decimal-pad"
+              style={[styles.input, { flex: 1 }]}
+            />
+            <View style={styles.currencyToggle}>
+              {(['KRW', 'USD'] as const).map((c) => (
+                <Pressable
+                  key={c}
+                  onPress={() => setCurrency(c)}
+                  style={[styles.currencyBtn, currency === c && styles.currencyBtnActive]}
+                >
+                  <Text
+                    style={[
+                      styles.currencyText,
+                      currency === c && styles.currencyTextActive,
+                    ]}
+                  >
+                    {c}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
 
           <Text style={styles.label}>비중 (%)</Text>
           <TextInput
@@ -188,6 +219,18 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
   },
   searchBtnText: { color: '#fff', fontWeight: '600' },
+  currencyToggle: {
+    flexDirection: 'row',
+    backgroundColor: colors.cardAlt,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  currencyBtn: { paddingHorizontal: spacing.md, paddingVertical: spacing.md },
+  currencyBtnActive: { backgroundColor: colors.primary },
+  currencyText: { color: colors.textDim, fontWeight: '600' },
+  currencyTextActive: { color: '#fff' },
   symbolHint: { color: colors.textDim, marginTop: spacing.xs, fontSize: 13 },
   hint: { color: colors.textDim, marginTop: spacing.xs, fontSize: 13 },
   submit: {
