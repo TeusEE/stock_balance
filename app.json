@@ -1,0 +1,20 @@
+{
+  "expo": {
+    "name": "Stock Balance",
+    "slug": "stock-balance",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.stockbalance.app"
+    },
+    "android": {
+      "package": "com.stockbalance.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    }
+  }
+}
