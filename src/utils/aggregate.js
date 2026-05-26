@@ -1,51 +1,40 @@
-import { Account, PortfolioItem } from '@/types';
-
-export interface AggregatedHolding {
-  key: string;
-  symbol?: string;
-  name: string;
-  totalValue: number;
-  percent: number;
-  perAccount: Array<{ accountId: string; accountName: string; value: number }>;
-}
-
 const FALLBACK_USD_KRW = 1350;
 
-export function exchangeRate(from: string, to: string, usdToKrw: number = FALLBACK_USD_KRW): number {
+export function exchangeRate(from, to, usdToKrw = FALLBACK_USD_KRW) {
   if (from === to) return 1;
   if (from === 'USD' && to === 'KRW') return usdToKrw;
   if (from === 'KRW' && to === 'USD') return 1 / usdToKrw;
   return 1;
 }
 
-function itemKey(item: PortfolioItem): string {
+function itemKey(item) {
   if (item.symbol) return `S:${item.symbol.toUpperCase()}`;
   return `N:${item.name.trim().toLowerCase()}`;
 }
 
-export function sumTargetPercent(items: PortfolioItem[]): number {
+export function sumTargetPercent(items) {
   return items.reduce((acc, it) => acc + (Number(it.targetPercent) || 0), 0);
 }
 
-export function isValidAllocation(items: PortfolioItem[], tolerance = 0.01): boolean {
+export function isValidAllocation(items, tolerance = 0.01) {
   if (items.length === 0) return true;
   const total = sumTargetPercent(items);
   return Math.abs(total - 100) <= tolerance;
 }
 
 /**
- * Aggregate all items across all accounts into a single distribution,
- * normalized to the requested base currency (default KRW).
+ * 모든 계좌의 항목들을 하나의 분포로 합산합니다.
+ * 같은 심볼(또는 같은 이름)이면 한 항목으로 통합되며,
+ * 통화가 다르면 KRW/USD로 환산해서 합칩니다.
  *
- * Each item's contribution = account.totalAmount * (item.targetPercent / 100),
- * converted to base currency.
+ * 각 항목의 기여도 = 계좌 총금액 * (비중 / 100) → baseCurrency로 환산
  */
 export function aggregateAcrossAccounts(
-  accounts: Account[],
-  baseCurrency: 'KRW' | 'USD' = 'KRW',
-  usdToKrw: number = FALLBACK_USD_KRW,
-): { totalBase: number; holdings: AggregatedHolding[] } {
-  const map = new Map<string, AggregatedHolding>();
+  accounts,
+  baseCurrency = 'KRW',
+  usdToKrw = FALLBACK_USD_KRW,
+) {
+  const map = new Map();
   let totalBase = 0;
 
   for (const acc of accounts) {

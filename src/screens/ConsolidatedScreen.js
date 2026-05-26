@@ -7,9 +7,9 @@ import { colorAt, colors, radius, spacing } from '@/theme';
 import { formatCurrency, formatPercent } from '@/utils/format';
 import { DonutChart } from '@/components/DonutChart';
 
-export const ConsolidatedScreen: React.FC = () => {
+export const ConsolidatedScreen = () => {
   const { state } = usePortfolio();
-  const [base, setBase] = useState<'KRW' | 'USD'>('KRW');
+  const [base, setBase] = useState('KRW');
 
   const { totalBase, holdings } = useMemo(
     () => aggregateAcrossAccounts(state.accounts, base),
@@ -22,7 +22,7 @@ export const ConsolidatedScreen: React.FC = () => {
         <View style={styles.header}>
           <Text style={styles.title}>모든 계좌 통합</Text>
           <View style={styles.currencyToggle}>
-            {(['KRW', 'USD'] as const).map((c) => (
+            {['KRW', 'USD'].map((c) => (
               <Pressable
                 key={c}
                 onPress={() => setBase(c)}

@@ -1,32 +1,12 @@
-import { StockQuote } from '@/types';
-
 const SEARCH_URL = 'https://query2.finance.yahoo.com/v1/finance/search';
 const QUOTE_URL = 'https://query1.finance.yahoo.com/v7/finance/quote';
 
-type YahooSearchQuote = {
-  symbol: string;
-  shortname?: string;
-  longname?: string;
-  exchange?: string;
-  quoteType?: string;
-};
-
-type YahooQuote = {
-  symbol: string;
-  shortName?: string;
-  longName?: string;
-  fullExchangeName?: string;
-  currency?: string;
-  regularMarketPrice?: number;
-  marketState?: string;
-};
-
 /**
- * Search stocks/ETFs via Yahoo Finance.
- * Supports US tickers (e.g. AAPL, VOO) and Korean tickers (e.g. 005930.KS, 091160.KQ).
- * Korean users can also search by Korean name (e.g. "삼성전자").
+ * Yahoo Finance로 주식/ETF를 검색합니다.
+ * - 미국: AAPL, VOO 등
+ * - 한국: 005930.KS, 091160.KQ 등 (한글 종목명도 검색 가능)
  */
-export async function searchStocks(query: string): Promise<StockQuote[]> {
+export async function searchStocks(query) {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
@@ -37,11 +17,11 @@ export async function searchStocks(query: string): Promise<StockQuote[]> {
   if (!res.ok) {
     throw new Error(`Search failed: ${res.status}`);
   }
-  const data = (await res.json()) as { quotes?: YahooSearchQuote[] };
+  const data = await res.json();
   const quotes = data.quotes ?? [];
   return quotes
     .filter((q) => q.symbol && (q.quoteType === 'EQUITY' || q.quoteType === 'ETF'))
-    .map<StockQuote>((q) => ({
+    .map((q) => ({
       symbol: q.symbol,
       shortname: q.shortname ?? q.symbol,
       longname: q.longname,
@@ -49,7 +29,7 @@ export async function searchStocks(query: string): Promise<StockQuote[]> {
     }));
 }
 
-export async function fetchQuotes(symbols: string[]): Promise<Record<string, StockQuote>> {
+export async function fetchQuotes(symbols) {
   if (symbols.length === 0) return {};
   const url = `${QUOTE_URL}?symbols=${encodeURIComponent(symbols.join(','))}`;
   const res = await fetch(url, {
@@ -58,9 +38,9 @@ export async function fetchQuotes(symbols: string[]): Promise<Record<string, Sto
   if (!res.ok) {
     throw new Error(`Quote fetch failed: ${res.status}`);
   }
-  const data = (await res.json()) as { quoteResponse?: { result?: YahooQuote[] } };
+  const data = await res.json();
   const result = data.quoteResponse?.result ?? [];
-  const out: Record<string, StockQuote> = {};
+  const out = {};
   for (const q of result) {
     out[q.symbol] = {
       symbol: q.symbol,
@@ -75,7 +55,7 @@ export async function fetchQuotes(symbols: string[]): Promise<Record<string, Sto
   return out;
 }
 
-export async function fetchQuote(symbol: string): Promise<StockQuote | null> {
+export async function fetchQuote(symbol) {
   const map = await fetchQuotes([symbol]);
   return map[symbol] ?? null;
 }

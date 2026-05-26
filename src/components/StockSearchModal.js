@@ -9,22 +9,15 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { StockQuote } from '@/types';
 import { fetchQuote, searchStocks } from '@/services/stockApi';
 import { colors, radius, spacing } from '@/theme';
 
-interface Props {
-  visible: boolean;
-  onClose: () => void;
-  onSelect: (quote: StockQuote) => void;
-}
-
-export const StockSearchModal: React.FC<Props> = ({ visible, onClose, onSelect }) => {
+export const StockSearchModal = ({ visible, onClose, onSelect }) => {
   const [query, setQuery] = useState('');
-  const [results, setResults] = useState<StockQuote[]>([]);
+  const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [error, setError] = useState(null);
+  const debounceRef = useRef(null);
 
   useEffect(() => {
     if (!visible) {
@@ -58,7 +51,7 @@ export const StockSearchModal: React.FC<Props> = ({ visible, onClose, onSelect }
     };
   }, [query]);
 
-  const handleSelect = async (quote: StockQuote) => {
+  const handleSelect = async (quote) => {
     try {
       const detail = await fetchQuote(quote.symbol);
       onSelect(detail ?? quote);

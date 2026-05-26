@@ -13,14 +13,13 @@ import { usePortfolio } from '@/context/PortfolioContext';
 import { AccountTabsBar } from '@/components/AccountTabsBar';
 import { ItemEditorModal } from '@/components/ItemEditorModal';
 import { DonutChart } from '@/components/DonutChart';
-import { PortfolioItem } from '@/types';
 import { colors, colorAt, radius, spacing } from '@/theme';
 import { formatCurrency, formatPercent } from '@/utils/format';
 import { isValidAllocation, sumTargetPercent } from '@/utils/aggregate';
 import { computeAccountRebalance } from '@/utils/rebalance';
 import { fetchQuotes } from '@/services/stockApi';
 
-export const AccountScreen: React.FC = () => {
+export const AccountScreen = () => {
   const {
     state,
     addAccount,
@@ -40,52 +39,30 @@ export const AccountScreen: React.FC = () => {
   );
 
   const [editorVisible, setEditorVisible] = useState(false);
-  const [editingItem, setEditingItem] = useState<PortfolioItem | undefined>(undefined);
+  const [editingItem, setEditingItem] = useState(undefined);
   const [totalInput, setTotalInput] = useState('');
   const [nameInput, setNameInput] = useState('');
+  const [refreshing, setRefreshing] = useState(false);
+  const autoRefreshedRef = useRef(new Set());
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (activeAccount) {
       setTotalInput(activeAccount.totalAmount ? String(activeAccount.totalAmount) : '');
       setNameInput(activeAccount.name);
     }
   }, [activeAccount?.id]);
 
-  if (state.accounts.length === 0) {
-    return (
-      <SafeAreaView style={styles.safe} edges={['top']}>
-        <AccountTabsBar accounts={[]} onSelect={setActiveAccount} onAdd={() => addAccount('')} />
-        <View style={styles.empty}>
-          <Text style={styles.emptyTitle}>아직 계좌가 없습니다</Text>
-          <Text style={styles.emptyDesc}>
-            상단의 “＋ 탭 추가” 버튼으로 새 계좌를 만들어 주세요.
-          </Text>
-          <Pressable style={styles.primaryBtn} onPress={() => addAccount('')}>
-            <Text style={styles.primaryBtnText}>＋ 계좌 추가</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
-  if (!activeAccount) return null;
-
-  const totalPercent = sumTargetPercent(activeAccount.items);
-  const valid = isValidAllocation(activeAccount.items);
-  const remaining = 100 - totalPercent;
-
   const rebalance = useMemo(
-    () => computeAccountRebalance(activeAccount),
+    () => (activeAccount ? computeAccountRebalance(activeAccount) : null),
     [activeAccount],
   );
 
-  const [refreshing, setRefreshing] = useState(false);
-
   const refreshPrices = useCallback(
-    async (silent: boolean) => {
+    async (silent) => {
+      if (!activeAccount) return;
       const symbols = activeAccount.items
         .filter((it) => it.symbol)
-        .map((it) => it.symbol as string);
+        .map((it) => it.symbol);
       if (symbols.length === 0) return;
       setRefreshing(true);
       try {
@@ -115,7 +92,6 @@ export const AccountScreen: React.FC = () => {
     refreshPrices(false);
   }, [refreshPrices]);
 
-  const autoRefreshedRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     if (!activeAccount) return;
     if (autoRefreshedRef.current.has(activeAccount.id)) return;
@@ -130,6 +106,29 @@ export const AccountScreen: React.FC = () => {
       refreshPrices(true);
     }
   }, [activeAccount?.id, refreshPrices]);
+
+  if (state.accounts.length === 0) {
+    return (
+      <SafeAreaView style={styles.safe} edges={['top']}>
+        <AccountTabsBar accounts={[]} onSelect={setActiveAccount} onAdd={() => addAccount('')} />
+        <View style={styles.empty}>
+          <Text style={styles.emptyTitle}>아직 계좌가 없습니다</Text>
+          <Text style={styles.emptyDesc}>
+            상단의 “＋ 탭 추가” 버튼으로 새 계좌를 만들어 주세요.
+          </Text>
+          <Pressable style={styles.primaryBtn} onPress={() => addAccount('')}>
+            <Text style={styles.primaryBtnText}>＋ 계좌 추가</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!activeAccount || !rebalance) return null;
+
+  const totalPercent = sumTargetPercent(activeAccount.items);
+  const valid = isValidAllocation(activeAccount.items);
+  const remaining = 100 - totalPercent;
 
   const handleDeleteAccount = () => {
     Alert.alert('계좌 삭제', `“${activeAccount.name}” 계좌를 삭제할까요?`, [
@@ -185,7 +184,7 @@ export const AccountScreen: React.FC = () => {
               keyboardType="decimal-pad"
             />
             <View style={styles.currencyToggle}>
-              {(['KRW', 'USD'] as const).map((c) => (
+              {['KRW', 'USD'].map((c) => (
                 <Pressable
                   key={c}
                   onPress={() => setCurrency(activeAccount.id, c)}

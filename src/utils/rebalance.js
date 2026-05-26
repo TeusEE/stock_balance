@@ -1,31 +1,26 @@
-import { Account, PortfolioItem } from '@/types';
 import { exchangeRate } from './aggregate';
 
 const FALLBACK_USD_KRW = 1350;
 
-export interface ItemRebalance {
-  /** 해당 항목이 목표 비중으로 차지해야 하는 금액 (계좌 통화 기준) */
-  targetValue: number;
-  /** 계좌 통화로 환산된 1주 가격 */
-  priceInAccount: number;
-  /** 목표 금액에 근접하기 위해 매수해야 할 수량 (예산 초과를 막기 위해 내림) */
-  shares: number;
-  /** shares × priceInAccount — 실제 매수에 들 금액 */
-  actualValue: number;
-  /** targetValue - actualValue — 남는(부족한) 금액 */
-  remaining: number;
-  /** 가격 정보가 있어 계산이 유효한지 여부 */
-  hasPrice: boolean;
-}
-
+/**
+ * 한 항목의 권장 매수 수량을 계산합니다.
+ *
+ * 반환 객체:
+ *   - targetValue:    목표 금액 (계좌 통화 기준)
+ *   - priceInAccount: 계좌 통화로 환산된 1주 가격
+ *   - shares:         권장 매수 주식 수 (예산 초과 방지 위해 내림)
+ *   - actualValue:    shares * priceInAccount (실제 매수 금액)
+ *   - remaining:      targetValue - actualValue (양수면 부족, 음수면 초과)
+ *   - hasPrice:       가격 정보가 있어 계산이 유효한지 여부
+ */
 export function computeItemRebalance(
-  totalAmount: number,
-  targetPercent: number,
-  currentPrice: number | undefined,
-  itemCurrency: string | undefined,
-  accountCurrency: 'KRW' | 'USD',
-  usdToKrw: number = FALLBACK_USD_KRW,
-): ItemRebalance {
+  totalAmount,
+  targetPercent,
+  currentPrice,
+  itemCurrency,
+  accountCurrency,
+  usdToKrw = FALLBACK_USD_KRW,
+) {
   const targetValue = totalAmount * ((Number(targetPercent) || 0) / 100);
   if (!currentPrice || currentPrice <= 0) {
     return {
@@ -52,17 +47,7 @@ export function computeItemRebalance(
   };
 }
 
-export interface AccountRebalanceSummary {
-  totalTarget: number;
-  totalActual: number;
-  totalUnallocated: number;
-  items: Array<{ item: PortfolioItem; rebalance: ItemRebalance }>;
-}
-
-export function computeAccountRebalance(
-  account: Account,
-  usdToKrw: number = FALLBACK_USD_KRW,
-): AccountRebalanceSummary {
+export function computeAccountRebalance(account, usdToKrw = FALLBACK_USD_KRW) {
   const items = account.items.map((item) => ({
     item,
     rebalance: computeItemRebalance(

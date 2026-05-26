@@ -21,7 +21,7 @@ const navTheme = {
   },
 };
 
-export const AppNavigator: React.FC = () => {
+export const AppNavigator = () => {
   return (
     <NavigationContainer theme={navTheme}>
       <Tab.Navigator

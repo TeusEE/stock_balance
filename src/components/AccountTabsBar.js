@@ -1,16 +1,8 @@
 import React from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { Account } from '@/types';
 import { colors, radius, spacing } from '@/theme';
 
-interface Props {
-  accounts: Account[];
-  activeId?: string;
-  onSelect: (id: string) => void;
-  onAdd: () => void;
-}
-
-export const AccountTabsBar: React.FC<Props> = ({ accounts, activeId, onSelect, onAdd }) => {
+export const AccountTabsBar = ({ accounts, activeId, onSelect, onAdd }) => {
   return (
     <View style={styles.container}>
       <ScrollView

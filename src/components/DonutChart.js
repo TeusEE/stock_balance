@@ -3,18 +3,7 @@ import { View } from 'react-native';
 import Svg, { Circle, G } from 'react-native-svg';
 import { colorAt, colors } from '@/theme';
 
-interface Slice {
-  value: number;
-  color?: string;
-}
-
-interface Props {
-  data: Slice[];
-  size?: number;
-  thickness?: number;
-}
-
-export const DonutChart: React.FC<Props> = ({ data, size = 180, thickness = 22 }) => {
+export const DonutChart = ({ data, size = 180, thickness = 22 }) => {
   const radius = (size - thickness) / 2;
   const circumference = 2 * Math.PI * radius;
   const total = data.reduce((s, d) => s + Math.max(0, d.value), 0);

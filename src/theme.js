@@ -27,7 +27,7 @@ export const palette = [
   '#60a5fa',
 ];
 
-export function colorAt(i: number): string {
+export function colorAt(i) {
   return palette[i % palette.length];
 }
 

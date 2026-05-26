@@ -7,19 +7,10 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { PortfolioItem, StockQuote } from '@/types';
 import { colors, radius, spacing } from '@/theme';
 import { StockSearchModal } from './StockSearchModal';
 
-interface Props {
-  visible: boolean;
-  initial?: Partial<PortfolioItem>;
-  remainingPercent: number;
-  onClose: () => void;
-  onSubmit: (item: Omit<PortfolioItem, 'id'>) => void;
-}
-
-export const ItemEditorModal: React.FC<Props> = ({
+export const ItemEditorModal = ({
   visible,
   initial,
   remainingPercent,
@@ -27,10 +18,10 @@ export const ItemEditorModal: React.FC<Props> = ({
   onSubmit,
 }) => {
   const [name, setName] = useState('');
-  const [symbol, setSymbol] = useState<string | undefined>(undefined);
+  const [symbol, setSymbol] = useState(undefined);
   const [percent, setPercent] = useState('');
   const [priceInput, setPriceInput] = useState('');
-  const [currency, setCurrency] = useState<string | undefined>(undefined);
+  const [currency, setCurrency] = useState(undefined);
   const [manual, setManual] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -45,7 +36,7 @@ export const ItemEditorModal: React.FC<Props> = ({
     }
   }, [visible, initial]);
 
-  const handleSelectStock = (q: StockQuote) => {
+  const handleSelectStock = (q) => {
     setName(q.longname || q.shortname);
     setSymbol(q.symbol);
     setPriceInput(q.price != null ? String(q.price) : '');
@@ -127,7 +118,7 @@ export const ItemEditorModal: React.FC<Props> = ({
               style={[styles.input, { flex: 1 }]}
             />
             <View style={styles.currencyToggle}>
-              {(['KRW', 'USD'] as const).map((c) => (
+              {['KRW', 'USD'].map((c) => (
                 <Pressable
                   key={c}
                   onPress={() => setCurrency(c)}

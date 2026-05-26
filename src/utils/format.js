@@ -1,6 +1,4 @@
-import { Currency } from '@/types';
-
-export function formatCurrency(amount: number, currency: Currency | string = 'KRW'): string {
+export function formatCurrency(amount, currency = 'KRW') {
   if (!isFinite(amount)) return '-';
   const locale = currency === 'USD' ? 'en-US' : 'ko-KR';
   const fractionDigits = currency === 'USD' ? 2 : 0;
@@ -16,11 +14,11 @@ export function formatCurrency(amount: number, currency: Currency | string = 'KR
   }
 }
 
-export function formatPercent(value: number, fractionDigits = 2): string {
+export function formatPercent(value, fractionDigits = 2) {
   if (!isFinite(value)) return '-';
   return `${value.toFixed(fractionDigits)}%`;
 }
 
-export function genId(prefix = 'id'): string {
+export function genId(prefix = 'id') {
   return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }

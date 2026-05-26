@@ -62,34 +62,35 @@ npx expo start
 
 ## 프로젝트 구조
 
+> 전체 JavaScript로 작성되어 있습니다. (TypeScript 사용 안 함)
+
 ```
 .
-├── App.tsx                          # 진입점
+├── App.js                           # 진입점
 ├── app.json                         # Expo 설정
-├── babel.config.js
-├── tsconfig.json                    # @/* alias 설정
+├── babel.config.js                  # @/* 경로 alias
+├── jsconfig.json                    # 에디터(VS Code) 경로 자동완성용
 └── src
     ├── components/
-    │   ├── AccountTabsBar.tsx       # 동적 가로 탭 바
-    │   ├── DonutChart.tsx           # SVG 도넛 차트
-    │   ├── ItemEditorModal.tsx      # 항목 추가/편집 모달
-    │   └── StockSearchModal.tsx     # 주식/ETF 검색
+    │   ├── AccountTabsBar.js        # 동적 가로 탭 바
+    │   ├── DonutChart.js            # SVG 도넛 차트
+    │   ├── ItemEditorModal.js       # 항목 추가/편집 모달
+    │   └── StockSearchModal.js      # 주식/ETF 검색
     ├── context/
-    │   └── PortfolioContext.tsx     # 전역 상태 + AsyncStorage 영속화
+    │   └── PortfolioContext.js      # 전역 상태 + AsyncStorage 영속화
     ├── navigation/
-    │   └── AppNavigator.tsx
+    │   └── AppNavigator.js
     ├── screens/
-    │   ├── AccountScreen.tsx        # 계좌별 편집 화면
-    │   └── ConsolidatedScreen.tsx   # 통합 뷰
+    │   ├── AccountScreen.js         # 계좌별 편집 화면
+    │   └── ConsolidatedScreen.js    # 통합 뷰
     ├── services/
-    │   └── stockApi.ts              # Yahoo Finance 연동
-    ├── types/
-    │   └── index.ts
+    │   └── stockApi.js              # Yahoo Finance 연동
     ├── utils/
-    │   ├── aggregate.ts             # 비중 계산/통합 로직
-    │   ├── format.ts
-    │   └── storage.ts
-    └── theme.ts
+    │   ├── aggregate.js             # 비중 계산/통합 로직
+    │   ├── format.js
+    │   ├── rebalance.js             # 권장 매수 수량 계산
+    │   └── storage.js
+    └── theme.js
 ```
 
 ## 비중 검증 규칙
@@ -104,7 +105,7 @@ npx expo start
 2. 통화가 다른 경우 KRW/USD 환율(임시 1,350 고정값)로 환산
 3. 같은 `symbol`을 가진 항목, 또는 (symbol이 없을 경우) 같은 이름의 항목은 통합 뷰에서 하나로 합쳐 비중을 재계산합니다.
 
-> 환율은 추후 실시간 환율 API 연동으로 쉽게 교체할 수 있도록 `src/utils/aggregate.ts`의 `exchangeRate()`로 분리되어 있습니다.
+> 환율은 추후 실시간 환율 API 연동으로 쉽게 교체할 수 있도록 `src/utils/aggregate.js`의 `exchangeRate()`로 분리되어 있습니다.
 
 ## 향후 확장 아이디어
 
