@@ -67,11 +67,27 @@ npx expo start
 
 ### 4) 테스트
 
+**단위 테스트 (네트워크 불필요, 빠름)**
+
 ```bash
 npm test
 ```
 
-`jest-expo` 기반 단위 테스트입니다. `src/services/__tests__/stockApi.test.js`에서 삼성전자(005930.KS)를 기준으로 현재가 파싱 로직을 검증합니다.
+`jest-expo` 기반입니다. `src/services/__tests__/stockApi.test.js`에서 fetch를 모킹해
+삼성전자(005930.KS)를 기준으로 현재가 파싱 로직 / 엔드포인트 선택 / 부분 실패 처리를 검증합니다.
+
+**라이브 검증 (실제 Yahoo Finance 호출, 네트워크 필요)**
+
+```bash
+npm run test:live
+```
+
+`scripts/check-live-price.js`가 Node 네이티브 fetch로 실제 `stockApi.js`를 호출해
+삼성전자의 **현재가를 실제로 가져와 출력**하고 검증합니다.
+
+> ⚠️ 이 라이브 검증은 jest로 하지 않습니다. jest(jest-expo)는 React Native용 fetch
+> 폴리필을 전역에 설치해 실제 네트워크를 타지 못하기 때문입니다. 그래서 실제 API 검증은
+> 별도 Node 스크립트로 분리했습니다. 외부 네트워크가 막힌 CI/샌드박스에서는 실패합니다(정상).
 
 ## 프로젝트 구조
 
