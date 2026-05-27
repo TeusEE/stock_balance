@@ -65,6 +65,14 @@ npx expo start
 - iOS 시뮬레이터: `npm run ios`
 - Android 에뮬레이터: `npm run android`
 
+### 4) 테스트
+
+```bash
+npm test
+```
+
+`jest-expo` 기반 단위 테스트입니다. `src/services/__tests__/stockApi.test.js`에서 삼성전자(005930.KS)를 기준으로 현재가 파싱 로직을 검증합니다.
+
 ## 프로젝트 구조
 
 > 전체 JavaScript로 작성되어 있습니다. (TypeScript 사용 안 함)
