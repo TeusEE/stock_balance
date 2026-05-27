@@ -13,10 +13,12 @@ import { usePortfolio } from '@/context/PortfolioContext';
 import { AccountTabsBar } from '@/components/AccountTabsBar';
 import { ItemEditorModal } from '@/components/ItemEditorModal';
 import { DonutChart } from '@/components/DonutChart';
+import { ExportButtons } from '@/components/ExportButtons';
 import { colors, colorAt, radius, spacing } from '@/theme';
 import { formatCurrency, formatPercent } from '@/utils/format';
 import { isValidAllocation, sumTargetPercent } from '@/utils/aggregate';
 import { computeAccountRebalance } from '@/utils/rebalance';
+import { buildAccountExport } from '@/utils/exportData';
 import { fetchQuotes } from '@/services/stockApi';
 
 export const AccountScreen = () => {
@@ -357,6 +359,14 @@ export const AccountScreen = () => {
           })
         )}
 
+        <View style={styles.exportSection}>
+          <Text style={styles.sectionTitle}>내보내기</Text>
+          <ExportButtons
+            label="계좌"
+            getData={() => buildAccountExport(activeAccount, rebalance)}
+          />
+        </View>
+
         <Pressable style={styles.dangerBtn} onPress={handleDeleteAccount}>
           <Text style={styles.dangerBtnText}>이 계좌 삭제</Text>
         </Pressable>
@@ -503,6 +513,7 @@ const styles = StyleSheet.create({
   rebalanceLabel: { color: colors.textDim, fontSize: 14 },
   rebalanceValue: { color: colors.text, fontSize: 16, fontWeight: '700' },
   rebalanceHint: { color: colors.textDim, fontSize: 11, marginTop: spacing.xs },
+  exportSection: { marginTop: spacing.md, gap: spacing.sm },
   primaryBtn: {
     marginTop: spacing.lg,
     backgroundColor: colors.primary,

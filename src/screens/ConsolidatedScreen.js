@@ -6,6 +6,8 @@ import { aggregateAcrossAccounts } from '@/utils/aggregate';
 import { colorAt, colors, radius, spacing } from '@/theme';
 import { formatCurrency, formatPercent } from '@/utils/format';
 import { DonutChart } from '@/components/DonutChart';
+import { ExportButtons } from '@/components/ExportButtons';
+import { buildConsolidatedExport } from '@/utils/exportData';
 
 export const ConsolidatedScreen = () => {
   const { state } = usePortfolio();
@@ -83,6 +85,23 @@ export const ConsolidatedScreen = () => {
             </View>
           ))
         )}
+
+        {holdings.length > 0 && (
+          <View style={styles.exportSection}>
+            <Text style={styles.sectionTitle}>내보내기</Text>
+            <ExportButtons
+              label="통합 포트폴리오"
+              getData={() =>
+                buildConsolidatedExport({
+                  baseCurrency: base,
+                  totalBase,
+                  holdings,
+                  accountsCount: state.accounts.length,
+                })
+              }
+            />
+          </View>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -120,6 +139,7 @@ const styles = StyleSheet.create({
   subInfo: { color: colors.textDim, fontSize: 12, marginTop: spacing.sm },
   fxNote: { color: colors.textDim, fontSize: 11, marginTop: spacing.xs },
   sectionTitle: { color: colors.text, fontSize: 16, fontWeight: '700', marginTop: spacing.md },
+  exportSection: { marginTop: spacing.md, gap: spacing.sm },
   emptyCard: {
     backgroundColor: colors.card,
     borderRadius: radius.md,
