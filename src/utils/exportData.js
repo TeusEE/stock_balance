@@ -14,6 +14,7 @@ export function buildAccountExport(account, rebalance) {
     ({ item, rebalance: rb }) => ({
       name: item.name,
       symbol: item.symbol ?? null,
+      category: item.category ?? null,
       manual: !!item.manual,
       targetPercent: round2(item.targetPercent),
       currentPrice: item.currentPrice ?? null,

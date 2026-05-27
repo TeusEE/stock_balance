@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '@/theme';
+import { CATEGORIES, DEFAULT_CATEGORY } from '@/constants/categories';
 import { StockSearchModal } from './StockSearchModal';
 
 export const ItemEditorModal = ({
@@ -22,6 +23,7 @@ export const ItemEditorModal = ({
   const [percent, setPercent] = useState('');
   const [priceInput, setPriceInput] = useState('');
   const [currency, setCurrency] = useState(undefined);
+  const [category, setCategory] = useState(DEFAULT_CATEGORY);
   const [manual, setManual] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -32,6 +34,7 @@ export const ItemEditorModal = ({
       setPercent(initial?.targetPercent != null ? String(initial.targetPercent) : '');
       setPriceInput(initial?.currentPrice != null ? String(initial.currentPrice) : '');
       setCurrency(initial?.currency);
+      setCategory(initial?.category ?? DEFAULT_CATEGORY);
       setManual(initial?.manual ?? !initial?.symbol);
     }
   }, [visible, initial]);
@@ -56,6 +59,7 @@ export const ItemEditorModal = ({
       targetPercent: pct,
       currentPrice: price,
       currency,
+      category,
       manual,
       lastPriceUpdatedAt: price ? Date.now() : undefined,
     });
@@ -104,6 +108,27 @@ export const ItemEditorModal = ({
               {currency ? `  ·  ${currency}` : ''}
             </Text>
           ) : null}
+
+          <Text style={styles.label}>분류</Text>
+          <View style={styles.categoryWrap}>
+            {CATEGORIES.map((c) => {
+              const active = category === c.key;
+              return (
+                <Pressable
+                  key={c.key}
+                  onPress={() => setCategory(c.key)}
+                  style={[
+                    styles.categoryChip,
+                    active && { backgroundColor: c.color, borderColor: c.color },
+                  ]}
+                >
+                  <Text style={[styles.categoryChipText, active && styles.categoryChipTextActive]}>
+                    {c.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
 
           <Text style={styles.label}>
             현재가 {symbol ? '(검색 시 자동 입력, 수정 가능)' : '(선택)'}
@@ -223,6 +248,17 @@ const styles = StyleSheet.create({
   currencyText: { color: colors.textDim, fontWeight: '600' },
   currencyTextActive: { color: '#fff' },
   symbolHint: { color: colors.textDim, marginTop: spacing.xs, fontSize: 13 },
+  categoryWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  categoryChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.cardAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  categoryChipText: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
+  categoryChipTextActive: { color: '#fff' },
   hint: { color: colors.textDim, marginTop: spacing.xs, fontSize: 13 },
   submit: {
     backgroundColor: colors.primary,

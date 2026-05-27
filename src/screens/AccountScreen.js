@@ -19,6 +19,7 @@ import { formatCurrency, formatPercent } from '@/utils/format';
 import { isValidAllocation, sumTargetPercent } from '@/utils/aggregate';
 import { computeAccountRebalance } from '@/utils/rebalance';
 import { buildAccountExport } from '@/utils/exportData';
+import { categoryColor, categoryLabel } from '@/constants/categories';
 import { fetchQuotes } from '@/services/stockApi';
 
 export const AccountScreen = () => {
@@ -316,9 +317,18 @@ export const AccountScreen = () => {
                 <View style={[styles.itemColorDot, { backgroundColor: colorAt(i) }]} />
                 <View style={{ flex: 1 }}>
                   <View style={styles.itemHeaderRow}>
-                    <Text style={styles.itemName} numberOfLines={1}>
-                      {item.name}
-                    </Text>
+                    <View style={styles.itemNameWrap}>
+                      <Text style={styles.itemName} numberOfLines={1}>
+                        {item.name}
+                      </Text>
+                      <View
+                        style={[styles.categoryBadge, { borderColor: categoryColor(item.category) }]}
+                      >
+                        <Text style={[styles.categoryBadgeText, { color: categoryColor(item.category) }]}>
+                          {categoryLabel(item.category)}
+                        </Text>
+                      </View>
+                    </View>
                     <Text style={styles.itemPercent}>
                       {formatPercent(item.targetPercent)}
                     </Text>
@@ -484,7 +494,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  itemName: { color: colors.text, fontSize: 15, fontWeight: '600', flex: 1 },
+  itemNameWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  itemName: { color: colors.text, fontSize: 15, fontWeight: '600', flexShrink: 1 },
+  categoryBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
+    borderWidth: 1,
+  },
+  categoryBadgeText: { fontSize: 11, fontWeight: '700' },
   itemSub: { color: colors.textDim, fontSize: 12, marginTop: 2, flex: 1 },
   itemPercent: { color: colors.text, fontSize: 15, fontWeight: '700' },
   itemValue: { color: colors.textDim, fontSize: 12, marginTop: 2 },
