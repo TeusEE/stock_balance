@@ -7,8 +7,8 @@
 
 | 라우트 | 파일 | 핵심 역할 |
 |---|---|---|
-| 💼 계좌 | `src/screens/AccountScreen.js` | 계좌 탭 전환 + 단일 계좌 편집/리밸런싱 |
-| 📊 통합 | `src/screens/ConsolidatedScreen.js` | 전체 계좌 합산 (종목별 ↔ 카테고리 그룹별) |
+| 계좌 | `src/screens/AccountScreen.js` | 계좌 탭 전환 + 단일 계좌 편집/리밸런싱 |
+| 통합 | `src/screens/ConsolidatedScreen.js` | 전체 계좌 합산 (종목별 ↔ 카테고리 그룹별) |
 | (모달) | `src/components/ItemEditorModal.js` | 항목 추가/편집 — 종목/분류/가격/보유/비중 |
 | (모달) | `src/components/StockSearchModal.js` | Yahoo Finance 검색 → 종목 선택 |
 
@@ -68,7 +68,7 @@
 │                                              │
 │ [          이 계좌 삭제           ]          │
 ├─────────────────────────────────────────────┤
-│       💼 계좌✓        📊 통합                │  Bottom tabs
+│         계좌✓            통합                │  Bottom tabs (라벨만)
 └─────────────────────────────────────────────┘
 ```
 
@@ -128,7 +128,7 @@
 │ 내보내기 (데이터 있을 때만)                  │
 │ [  JSON 공유  ] [  JSON 복사  ]              │
 ├─────────────────────────────────────────────┤
-│       💼 계좌         📊 통합✓               │
+│         계좌              통합✓              │
 └─────────────────────────────────────────────┘
 ```
 
@@ -208,7 +208,7 @@ App.js
     │   state · usdToKrw · ready · CRUD actions
     └── NavigationContainer (dark theme)
         └── Bottom Tab Navigator         src/navigation/AppNavigator.js
-            ├── "Accounts" (💼)
+            ├── "Accounts" (계좌)
             │   └── AccountScreen        src/screens/AccountScreen.js
             │       ├── AccountTabsBar   src/components/AccountTabsBar.js
             │       ├── Account info card    (계좌명 + 총금액 + 통화)
@@ -220,7 +220,7 @@ App.js
             │       └── (Modal) ItemEditorModal
             │           └── (Modal) StockSearchModal
             │
-            └── "Consolidated" (📊)
+            └── "Consolidated" (통합)
                 └── ConsolidatedScreen   src/screens/ConsolidatedScreen.js
                     ├── Header + currency toggle
                     ├── View mode toggle      (종목별 ↔ 그룹별)

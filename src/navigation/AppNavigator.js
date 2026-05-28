@@ -1,5 +1,4 @@
 import React from 'react';
-import { Text } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { AccountScreen } from '@/screens/AccountScreen';
@@ -33,27 +32,22 @@ export const AppNavigator = () => {
           },
           tabBarActiveTintColor: colors.primary,
           tabBarInactiveTintColor: colors.textDim,
+          tabBarLabelStyle: {
+            fontSize: 14,
+            fontWeight: '600',
+            marginBottom: 4,
+          },
         }}
       >
         <Tab.Screen
           name="Accounts"
           component={AccountScreen}
-          options={{
-            title: '계좌',
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ color, fontSize: size }}>💼</Text>
-            ),
-          }}
+          options={{ title: '계좌' }}
         />
         <Tab.Screen
           name="Consolidated"
           component={ConsolidatedScreen}
-          options={{
-            title: '통합',
-            tabBarIcon: ({ color, size }) => (
-              <Text style={{ color, fontSize: size }}>📊</Text>
-            ),
-          }}
+          options={{ title: '통합' }}
         />
       </Tab.Navigator>
     </NavigationContainer>
