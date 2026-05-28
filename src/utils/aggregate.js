@@ -1,3 +1,5 @@
+import { DEFAULT_CATEGORY } from '@/constants/categories';
+
 const FALLBACK_USD_KRW = 1350;
 
 export function exchangeRate(from, to, usdToKrw = FALLBACK_USD_KRW) {
@@ -70,4 +72,59 @@ export function aggregateAcrossAccounts(
   }
   holdings.sort((a, b) => b.totalValue - a.totalValue);
   return { totalBase, holdings };
+}
+
+/**
+ * 모든 계좌의 항목들을 카테고리별로 그룹화해 합산합니다.
+ * 각 그룹은 해당 카테고리에 속한 항목들의 합계를 가집니다.
+ */
+export function aggregateByCategory(
+  accounts,
+  baseCurrency = 'KRW',
+  usdToKrw = FALLBACK_USD_KRW,
+) {
+  const map = new Map();
+  let totalBase = 0;
+
+  for (const acc of accounts) {
+    const rate = exchangeRate(acc.currency, baseCurrency, usdToKrw);
+    const accountTotalBase = acc.totalAmount * rate;
+    totalBase += accountTotalBase;
+    for (const item of acc.items) {
+      const value = accountTotalBase * ((Number(item.targetPercent) || 0) / 100);
+      const catKey = item.category || DEFAULT_CATEGORY;
+      const entry = map.get(catKey);
+      const holding = {
+        key: itemKey(item),
+        symbol: item.symbol,
+        name: item.name,
+        value,
+        accountName: acc.name,
+      };
+      if (entry) {
+        entry.totalValue += value;
+        entry.holdings.push(holding);
+      } else {
+        map.set(catKey, {
+          key: catKey,
+          category: catKey,
+          totalValue: value,
+          percent: 0,
+          holdings: [holding],
+        });
+      }
+    }
+  }
+
+  const groups = Array.from(map.values());
+  if (totalBase > 0) {
+    for (const g of groups) {
+      g.percent = (g.totalValue / totalBase) * 100;
+      for (const h of g.holdings) {
+        h.percent = totalBase > 0 ? (h.value / totalBase) * 100 : 0;
+      }
+    }
+  }
+  groups.sort((a, b) => b.totalValue - a.totalValue);
+  return { totalBase, groups };
 }
