@@ -24,6 +24,7 @@ export const ItemEditorModal = ({
   const [priceInput, setPriceInput] = useState('');
   const [currency, setCurrency] = useState(undefined);
   const [category, setCategory] = useState(DEFAULT_CATEGORY);
+  const [ownedInput, setOwnedInput] = useState('');
   const [manual, setManual] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
 
@@ -35,6 +36,7 @@ export const ItemEditorModal = ({
       setPriceInput(initial?.currentPrice != null ? String(initial.currentPrice) : '');
       setCurrency(initial?.currency);
       setCategory(initial?.category ?? DEFAULT_CATEGORY);
+      setOwnedInput(initial?.ownedShares != null ? String(initial.ownedShares) : '');
       setManual(initial?.manual ?? !initial?.symbol);
     }
   }, [visible, initial]);
@@ -53,6 +55,11 @@ export const ItemEditorModal = ({
     const parsedPrice = parseFloat(priceInput);
     const price =
       isFinite(parsedPrice) && parsedPrice > 0 ? parsedPrice : undefined;
+    const parsedOwned = parseFloat(ownedInput);
+    const ownedShares =
+      ownedInput.trim() !== '' && isFinite(parsedOwned) && parsedOwned >= 0
+        ? parsedOwned
+        : undefined;
     onSubmit({
       name: name.trim(),
       symbol,
@@ -60,6 +67,7 @@ export const ItemEditorModal = ({
       currentPrice: price,
       currency,
       category,
+      ownedShares,
       manual,
       lastPriceUpdatedAt: price ? Date.now() : undefined,
     });
@@ -161,6 +169,16 @@ export const ItemEditorModal = ({
               ))}
             </View>
           </View>
+
+          <Text style={styles.label}>보유 수량 (선택)</Text>
+          <TextInput
+            value={ownedInput}
+            onChangeText={setOwnedInput}
+            placeholder="예: 70 (지금 가지고 있는 주식 수)"
+            placeholderTextColor={colors.textDim}
+            keyboardType="decimal-pad"
+            style={styles.input}
+          />
 
           <Text style={styles.label}>비중 (%)</Text>
           <TextInput

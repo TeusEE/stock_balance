@@ -272,6 +272,27 @@ export const AccountScreen = () => {
                 {formatCurrency(rebalance.totalActual, activeAccount.currency)}
               </Text>
             </View>
+            {activeAccount.items.some((it) => it.ownedShares != null) && (
+              <View style={styles.rebalanceRow}>
+                <Text style={styles.rebalanceLabel}>추가 매수 필요액</Text>
+                <Text
+                  style={[
+                    styles.rebalanceValue,
+                    {
+                      color:
+                        rebalance.totalAdditionalCost > 0
+                          ? colors.primary
+                          : rebalance.totalAdditionalCost < 0
+                          ? colors.warning
+                          : colors.success,
+                    },
+                  ]}
+                >
+                  {rebalance.totalAdditionalCost > 0 ? '+' : rebalance.totalAdditionalCost < 0 ? '-' : ''}
+                  {formatCurrency(Math.abs(rebalance.totalAdditionalCost), activeAccount.currency)}
+                </Text>
+              </View>
+            )}
             <View style={styles.rebalanceRow}>
               <Text style={styles.rebalanceLabel}>예상 현금 잔액</Text>
               <Text
@@ -357,7 +378,38 @@ export const AccountScreen = () => {
                       {formatCurrency(rb.targetValue, activeAccount.currency)}
                     </Text>
                   </View>
-                  {rb.hasPrice ? (
+                  {rb.hasPrice && rb.ownedShares != null ? (
+                    <View style={styles.itemRebalanceBox}>
+                      <Text style={styles.itemRebalanceShares}>
+                        보유 {rb.ownedShares.toLocaleString()}주 → 목표 {rb.shares.toLocaleString()}주
+                      </Text>
+                      <Text
+                        style={[
+                          styles.itemRebalanceDelta,
+                          {
+                            color:
+                              rb.delta > 0
+                                ? colors.primary
+                                : rb.delta < 0
+                                ? colors.warning
+                                : colors.success,
+                          },
+                        ]}
+                      >
+                        {rb.delta > 0
+                          ? `+${rb.delta.toLocaleString()}주 매수`
+                          : rb.delta < 0
+                          ? `${rb.delta.toLocaleString()}주 매도`
+                          : '목표 달성 ✓'}
+                        {rb.delta !== 0
+                          ? `  (${rb.delta > 0 ? '+' : '-'}${formatCurrency(
+                              Math.abs(rb.additionalCost),
+                              activeAccount.currency,
+                            )})`
+                          : ''}
+                      </Text>
+                    </View>
+                  ) : rb.hasPrice ? (
                     <View style={styles.itemRebalanceBox}>
                       <Text style={styles.itemRebalanceShares}>
                         권장 매수 {rb.shares.toLocaleString()}주
@@ -367,6 +419,12 @@ export const AccountScreen = () => {
                         {'  ·  '}
                         {rb.remaining >= 0 ? '부족 ' : '초과 '}
                         {formatCurrency(Math.abs(rb.remaining), activeAccount.currency)}
+                      </Text>
+                    </View>
+                  ) : rb.ownedShares != null ? (
+                    <View style={styles.itemRebalanceBox}>
+                      <Text style={styles.itemRebalanceDetail}>
+                        보유 {rb.ownedShares.toLocaleString()}주 — 현재가 정보가 있으면 추가 매수 수량이 계산됩니다.
                       </Text>
                     </View>
                   ) : (
@@ -527,6 +585,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
   },
   itemRebalanceShares: { color: colors.primary, fontSize: 14, fontWeight: '700' },
+  itemRebalanceDelta: { fontSize: 13, fontWeight: '700', marginTop: 2 },
   itemRebalanceDetail: { color: colors.textDim, fontSize: 12, marginTop: 2 },
   itemRebalanceMissing: { color: colors.warning, fontSize: 12, fontStyle: 'italic' },
   rebalanceCard: {

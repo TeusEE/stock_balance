@@ -19,12 +19,16 @@ export function buildAccountExport(account, rebalance) {
       targetPercent: round2(item.targetPercent),
       currentPrice: item.currentPrice ?? null,
       currency: item.currency ?? account.currency,
+      ownedShares: item.ownedShares ?? null,
       ...(rb
         ? {
             targetValue: round2(rb.targetValue),
             recommendedShares: rb.shares,
             actualValue: round2(rb.actualValue),
             remaining: round2(rb.remaining),
+            ownedValue: round2(rb.ownedValue),
+            delta: rb.delta,
+            additionalCost: round2(rb.additionalCost),
           }
         : {}),
     }),
@@ -47,6 +51,7 @@ export function buildAccountExport(account, rebalance) {
         ? {
             recommendedBuyTotal: round2(rebalance.totalActual),
             expectedCashLeft: round2(rebalance.totalUnallocated),
+            additionalBuyCost: round2(rebalance.totalAdditionalCost),
           }
         : {}),
       items,
