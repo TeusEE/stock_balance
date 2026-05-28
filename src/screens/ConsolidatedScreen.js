@@ -11,19 +11,19 @@ import { ExportButtons } from '@/components/ExportButtons';
 import { buildConsolidatedExport } from '@/utils/exportData';
 
 export const ConsolidatedScreen = () => {
-  const { state } = usePortfolio();
+  const { state, usdToKrw, rateUpdatedAt } = usePortfolio();
   const [base, setBase] = useState('KRW');
   const [viewMode, setViewMode] = useState('symbol'); // 'symbol' | 'group'
   const [expandedGroups, setExpandedGroups] = useState({});
 
   const { totalBase, holdings } = useMemo(
-    () => aggregateAcrossAccounts(state.accounts, base),
-    [state.accounts, base],
+    () => aggregateAcrossAccounts(state.accounts, base, usdToKrw),
+    [state.accounts, base, usdToKrw],
   );
 
   const { groups } = useMemo(
-    () => aggregateByCategory(state.accounts, base),
-    [state.accounts, base],
+    () => aggregateByCategory(state.accounts, base, usdToKrw),
+    [state.accounts, base, usdToKrw],
   );
 
   const toggleGroup = (key) => {
@@ -84,7 +84,12 @@ export const ConsolidatedScreen = () => {
             <Text style={styles.subInfo}>
               계좌 {state.accounts.length}개 · {viewMode === 'symbol' ? `항목 ${holdings.length}개` : `그룹 ${groups.length}개`}
             </Text>
-            <Text style={styles.fxNote}>* USD→KRW 환율은 1,350 고정값으로 환산됩니다.</Text>
+            <Text style={styles.fxNote}>
+              {`USD/KRW  ${usdToKrw.toLocaleString('ko-KR', { maximumFractionDigits: 1 })}원`}
+              {rateUpdatedAt
+                ? `  ·  ${new Date(rateUpdatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })} 기준`
+                : '  (기본값 · 계좌탭에서 새로고침)'}
+            </Text>
           </View>
         </View>
 

@@ -9,6 +9,8 @@ import React, {
 import { loadState, saveState } from '@/utils/storage';
 import { genId } from '@/utils/format';
 
+const FALLBACK_USD_KRW = 1350;
+
 const initialState = {
   accounts: [],
   activeAccountId: undefined,
@@ -122,6 +124,8 @@ const PortfolioContext = createContext(undefined);
 export const PortfolioProvider = ({ children }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [ready, setReady] = useState(false);
+  const [usdToKrw, setUsdToKrw] = useState(FALLBACK_USD_KRW);
+  const [rateUpdatedAt, setRateUpdatedAt] = useState(null);
 
   useEffect(() => {
     (async () => {
@@ -143,6 +147,12 @@ export const PortfolioProvider = ({ children }) => {
     () => ({
       state,
       ready,
+      usdToKrw,
+      rateUpdatedAt,
+      setExchangeRate: (rate) => {
+        setUsdToKrw(rate);
+        setRateUpdatedAt(Date.now());
+      },
       addAccount: (name) => dispatch({ type: 'ADD_ACCOUNT', payload: { name } }),
       removeAccount: (accountId) => dispatch({ type: 'REMOVE_ACCOUNT', payload: { accountId } }),
       renameAccount: (accountId, name) =>
@@ -159,7 +169,7 @@ export const PortfolioProvider = ({ children }) => {
       removeItem: (accountId, itemId) =>
         dispatch({ type: 'REMOVE_ITEM', payload: { accountId, itemId } }),
     }),
-    [state, ready],
+    [state, ready, usdToKrw, rateUpdatedAt],
   );
 
   return <PortfolioContext.Provider value={value}>{children}</PortfolioContext.Provider>;

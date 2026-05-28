@@ -20,7 +20,7 @@ import { isValidAllocation, sumTargetPercent } from '@/utils/aggregate';
 import { computeAccountRebalance } from '@/utils/rebalance';
 import { buildAccountExport } from '@/utils/exportData';
 import { categoryColor, categoryLabel } from '@/constants/categories';
-import { fetchQuotes } from '@/services/stockApi';
+import { fetchExchangeRate, fetchQuotes } from '@/services/stockApi';
 
 export const AccountScreen = () => {
   const {
@@ -34,6 +34,9 @@ export const AccountScreen = () => {
     addItem,
     updateItem,
     removeItem,
+    usdToKrw,
+    rateUpdatedAt,
+    setExchangeRate,
   } = usePortfolio();
 
   const activeAccount = useMemo(
@@ -69,7 +72,11 @@ export const AccountScreen = () => {
       if (symbols.length === 0) return;
       setRefreshing(true);
       try {
-        const quotes = await fetchQuotes(symbols);
+        const [quotes, rate] = await Promise.all([
+          fetchQuotes(symbols),
+          fetchExchangeRate('USD', 'KRW'),
+        ]);
+        if (rate != null) setExchangeRate(rate);
         for (const item of activeAccount.items) {
           if (item.symbol && quotes[item.symbol]) {
             const q = quotes[item.symbol];
@@ -88,7 +95,7 @@ export const AccountScreen = () => {
         setRefreshing(false);
       }
     },
-    [activeAccount, updateItem],
+    [activeAccount, updateItem, setExchangeRate],
   );
 
   const handleRefreshPrices = useCallback(() => {
@@ -238,15 +245,21 @@ export const AccountScreen = () => {
                 : `남은 비중: ${formatPercent(remaining, 2)}`}
             </Text>
             {activeAccount.items.some((it) => it.symbol) && (
-              <Pressable
-                style={styles.refreshBtn}
-                onPress={handleRefreshPrices}
-                disabled={refreshing}
-              >
-                <Text style={styles.refreshBtnText}>
-                  {refreshing ? '갱신 중…' : '현재가 새로고침'}
+              <>
+                <Pressable
+                  style={styles.refreshBtn}
+                  onPress={handleRefreshPrices}
+                  disabled={refreshing}
+                >
+                  <Text style={styles.refreshBtnText}>
+                    {refreshing ? '갱신 중…' : '현재가 새로고침'}
+                  </Text>
+                </Pressable>
+                <Text style={styles.rateNote}>
+                  {`USD/KRW  ${usdToKrw.toLocaleString('ko-KR', { maximumFractionDigits: 1 })}원`}
+                  {rateUpdatedAt ? `  ·  ${new Date(rateUpdatedAt).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}` : '  (기본값)'}
                 </Text>
-              </Pressable>
+              </>
             )}
           </View>
         </View>
@@ -463,6 +476,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
   },
   refreshBtnText: { color: colors.text, fontSize: 13, fontWeight: '600' },
+  rateNote: { color: colors.textDim, fontSize: 11, marginTop: 4 },
   itemsHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',

@@ -86,3 +86,17 @@ export async function fetchQuote(symbol) {
   const map = await fetchQuotes([symbol]);
   return map[symbol] ?? null;
 }
+
+/**
+ * USD→KRW 현재 환율을 Yahoo Finance에서 가져옵니다. (USDKRW=X 심볼)
+ * 실패 시 null을 반환합니다.
+ */
+export async function fetchExchangeRate(from = 'USD', to = 'KRW') {
+  const symbol = `${from}${to}=X`;
+  const url = `${CHART_URL}/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
+  return typeof price === 'number' ? price : null;
+}
