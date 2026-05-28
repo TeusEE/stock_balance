@@ -28,7 +28,8 @@ export async function loadExchangeRate() {
     const raw = await AsyncStorage.getItem(RATE_KEY);
     if (!raw) return null;
     return JSON.parse(raw); // { usdToKrw: number, updatedAt: number }
-  } catch {
+  } catch (e) {
+    console.warn('Failed to load exchange rate', e);
     return null;
   }
 }

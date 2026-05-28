@@ -129,15 +129,20 @@ export const PortfolioProvider = ({ children }) => {
 
   useEffect(() => {
     (async () => {
-      const [persisted, savedRate] = await Promise.all([loadState(), loadExchangeRate()]);
-      if (persisted) {
-        dispatch({ type: 'HYDRATE', payload: persisted });
+      try {
+        const [persisted, savedRate] = await Promise.all([loadState(), loadExchangeRate()]);
+        if (persisted) {
+          dispatch({ type: 'HYDRATE', payload: persisted });
+        }
+        if (savedRate && typeof savedRate.usdToKrw === 'number') {
+          setUsdToKrw(savedRate.usdToKrw);
+          setRateUpdatedAt(savedRate.updatedAt);
+        }
+      } catch (e) {
+        console.warn('Failed to hydrate state', e);
+      } finally {
+        setReady(true);
       }
-      if (savedRate) {
-        setUsdToKrw(savedRate.usdToKrw);
-        setRateUpdatedAt(savedRate.updatedAt);
-      }
-      setReady(true);
     })();
   }, []);
 
