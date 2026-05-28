@@ -6,7 +6,7 @@ import React, {
   useReducer,
   useState,
 } from 'react';
-import { loadState, saveState } from '@/utils/storage';
+import { loadExchangeRate, loadState, saveExchangeRate, saveState } from '@/utils/storage';
 import { genId } from '@/utils/format';
 
 const FALLBACK_USD_KRW = 1350;
@@ -129,9 +129,13 @@ export const PortfolioProvider = ({ children }) => {
 
   useEffect(() => {
     (async () => {
-      const persisted = await loadState();
+      const [persisted, savedRate] = await Promise.all([loadState(), loadExchangeRate()]);
       if (persisted) {
         dispatch({ type: 'HYDRATE', payload: persisted });
+      }
+      if (savedRate) {
+        setUsdToKrw(savedRate.usdToKrw);
+        setRateUpdatedAt(savedRate.updatedAt);
       }
       setReady(true);
     })();
@@ -150,8 +154,10 @@ export const PortfolioProvider = ({ children }) => {
       usdToKrw,
       rateUpdatedAt,
       setExchangeRate: (rate) => {
+        const updatedAt = Date.now();
         setUsdToKrw(rate);
-        setRateUpdatedAt(Date.now());
+        setRateUpdatedAt(updatedAt);
+        saveExchangeRate(rate, updatedAt);
       },
       addAccount: (name) => dispatch({ type: 'ADD_ACCOUNT', payload: { name } }),
       removeAccount: (accountId) => dispatch({ type: 'REMOVE_ACCOUNT', payload: { accountId } }),

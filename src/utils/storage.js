@@ -20,3 +20,23 @@ export async function saveState(state) {
     console.warn('Failed to save state', e);
   }
 }
+
+const RATE_KEY = '@stock_balance/exchange_rate_v1';
+
+export async function loadExchangeRate() {
+  try {
+    const raw = await AsyncStorage.getItem(RATE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw); // { usdToKrw: number, updatedAt: number }
+  } catch {
+    return null;
+  }
+}
+
+export async function saveExchangeRate(usdToKrw, updatedAt) {
+  try {
+    await AsyncStorage.setItem(RATE_KEY, JSON.stringify({ usdToKrw, updatedAt }));
+  } catch (e) {
+    console.warn('Failed to save exchange rate', e);
+  }
+}
