@@ -93,12 +93,15 @@ eas login                   # Expo 계정으로 로그인 (없으면 expo.dev에
 eas build:configure
 ```
 
-→ `eas.json`이 생성됩니다. 아래는 이 프로젝트에 맞는 예시입니다
+→ `eas.json`이 생성됩니다. **이 프로젝트에는 이미 아래 내용으로 커밋돼 있습니다**
 (`production` 프로필이 App Store 제출용):
 
 ```jsonc
 {
-  "cli": { "version": ">= 3.0.0" },
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"          // 빌드 번호를 EAS가 원격에서 관리(자동 증가)
+  },
   "build": {
     "development": {
       "developmentClient": true,
@@ -116,6 +119,9 @@ eas build:configure
   }
 }
 ```
+
+> `appVersionSource: "remote"` 이므로 **빌드 번호(buildNumber)는 EAS가 자동 관리**합니다.
+> `app.json`에 buildNumber를 수동으로 둘 필요가 없습니다. (아래 ❶ 스니펫의 buildNumber는 생략 가능)
 
 ---
 
@@ -164,9 +170,10 @@ eas submit --platform ios --profile production
 - 업로드 후 App Store Connect에서 처리(프로세싱)에 수 분~수십 분 소요됩니다.
 
 ### 버전/빌드 번호 규칙
-- **version** (`app.json`의 `expo.version`, 예 `1.0.0`) = 사용자에게 보이는 버전. App Store 신규 버전마다 올림.
-- **buildNumber** (`expo.ios.buildNumber`) = 같은 version 내에서 업로드마다 **반드시 증가**해야 함.
-  - `eas.json`의 `production.autoIncrement: true`를 쓰면 EAS가 자동으로 올려 줍니다.
+- **version** (`app.json`의 `expo.version`, 예 `1.0.0`) = 사용자에게 보이는 버전. App Store 신규 버전마다 직접 올림.
+- **buildNumber** = 같은 version 내에서 업로드마다 **반드시 증가**해야 함.
+  - 이 프로젝트는 `eas.json`이 `appVersionSource: "remote"` + `production.autoIncrement: true` 라
+    **EAS가 원격에서 자동으로 증가**시킵니다. 수동 관리 불필요.
 
 ---
 
