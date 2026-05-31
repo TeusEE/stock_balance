@@ -21,6 +21,7 @@ import { computeAccountRebalance } from '@/utils/rebalance';
 import { buildAccountExport } from '@/utils/exportData';
 import { categoryColor, categoryLabel } from '@/constants/categories';
 import { fetchExchangeRate, fetchQuotes } from '@/services/stockApi';
+import { SCREENSHOT_ENABLED, screenshotEditorOpen } from '@/utils/screenshot';
 
 export const AccountScreen = () => {
   const {
@@ -103,6 +104,7 @@ export const AccountScreen = () => {
   }, [refreshPrices]);
 
   useEffect(() => {
+    if (SCREENSHOT_ENABLED) return; // 스크린샷 모드: 시드 가격 고정 (네트워크 새로고침 안 함)
     if (!activeAccount) return;
     if (autoRefreshedRef.current.has(activeAccount.id)) return;
     const STALE_MS = 5 * 60 * 1000;
@@ -454,9 +456,12 @@ export const AccountScreen = () => {
       </ScrollView>
 
       <ItemEditorModal
-        visible={editorVisible}
-        initial={editingItem}
-        remainingPercent={remaining + (editingItem?.targetPercent ?? 0)}
+        visible={editorVisible || screenshotEditorOpen()}
+        initial={screenshotEditorOpen() ? activeAccount.items[0] : editingItem}
+        remainingPercent={
+          remaining +
+          ((screenshotEditorOpen() ? activeAccount.items[0] : editingItem)?.targetPercent ?? 0)
+        }
         onClose={() => setEditorVisible(false)}
         onSubmit={(payload) => {
           if (editingItem) {

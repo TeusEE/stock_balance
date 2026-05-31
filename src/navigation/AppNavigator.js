@@ -4,6 +4,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { AccountScreen } from '@/screens/AccountScreen';
 import { ConsolidatedScreen } from '@/screens/ConsolidatedScreen';
 import { colors } from '@/theme';
+import { SCREENSHOT_ENABLED, screenshotInitialTab } from '@/utils/screenshot';
 
 const Tab = createBottomTabNavigator();
 
@@ -24,6 +25,7 @@ export const AppNavigator = () => {
   return (
     <NavigationContainer theme={navTheme}>
       <Tab.Navigator
+        initialRouteName={SCREENSHOT_ENABLED ? screenshotInitialTab() : undefined}
         screenOptions={{
           headerShown: false,
           tabBarStyle: {

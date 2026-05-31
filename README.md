@@ -67,7 +67,41 @@ npx expo start
 - iOS 시뮬레이터: `npm run ios`
 - Android 에뮬레이터: `npm run android`
 
-### 4) 테스트
+### 4) App Store 스크린샷 캡처
+
+App Store 제출용 스크린샷을 **데모 데이터로 채워진 화면**에서 자동 캡처합니다.
+
+```bash
+./scripts/screenshots.sh                      # 5개 화면 전체 캡처
+./scripts/screenshots.sh consolidated-group   # 특정 씬만
+DEVICE="iPhone 16 Pro Max" ./scripts/screenshots.sh   # 다른 디바이스
+```
+
+- 결과물: `screenshots/01~05-*.png` (1320×2868, **App Store 6.9" 필수 규격**)
+- 앱이 시뮬레이터에 없으면 `expo run:ios`로 자동 빌드 후 캡처합니다 (최초 1회 수 분).
+- 상태바는 9:41 / 풀 배터리·신호로 고정됩니다.
+
+캡처되는 5개 유즈케이스(씬):
+
+| 씬 | 파일 | 내용 |
+|---|---|---|
+| `account` | `01-account-rebalance.png` | 계좌 리밸런싱 — 비중 도넛 + 권장 매수/현금 잔액 + 보유→목표 델타 |
+| `consolidated-symbol` | `02-consolidated-symbol.png` | 통합 종목별 — 전 계좌 합산 자산 분포 |
+| `consolidated-group` | `03-consolidated-group.png` | 통합 그룹별 — 카테고리(성장/배당/채권/실물/현금) 분류 |
+| `editor` | `04-item-editor.png` | 항목 편집 — 분류/현재가/보유수량/비중 입력 |
+| `usd` | `05-usd-account.png` | USD 해외주식 계좌 |
+
+> 화면 상태와 데모 시드 데이터는 모두 [`src/utils/screenshot.js`](src/utils/screenshot.js)에서
+> `EXPO_PUBLIC_SCREENSHOT_SCENE` 환경변수로 제어됩니다. 이 변수가 없으면(=일반 실행/프로덕션 빌드)
+> 시드·씬 로직은 전부 비활성화되어 앱 동작에 **아무 영향이 없습니다**. 직접 한 화면만 띄워 보려면:
+>
+> ```bash
+> EXPO_PUBLIC_SCREENSHOT_SCENE=consolidated-group npx expo start
+> ```
+
+> 자세한 사용법·씬 추가·문제 해결은 [`docs/screenshots.md`](docs/screenshots.md) 참조.
+
+### 5) 테스트
 
 **단위 테스트 (네트워크 불필요, 빠름)**
 
@@ -120,8 +154,12 @@ npm run test:live
     │   ├── aggregate.js             # 비중 계산/통합 로직
     │   ├── format.js
     │   ├── rebalance.js             # 권장 매수 수량 계산
+    │   ├── screenshot.js            # App Store 스크린샷용 데모 시드/씬 (env로만 활성)
     │   └── storage.js
     └── theme.js
+
+scripts/
+ └── screenshots.sh                  # 시뮬레이터 스크린샷 자동 캡처
 ```
 
 ## 비중 검증 규칙

@@ -8,13 +8,16 @@ import React, {
 } from 'react';
 import { loadExchangeRate, loadState, saveExchangeRate, saveState } from '@/utils/storage';
 import { genId } from '@/utils/format';
+import { SCREENSHOT_ENABLED, SEED_STATE, SEED_RATE } from '@/utils/screenshot';
 
 const FALLBACK_USD_KRW = 1350;
 
-const initialState = {
-  accounts: [],
-  activeAccountId: undefined,
-};
+const initialState = SCREENSHOT_ENABLED
+  ? SEED_STATE
+  : {
+      accounts: [],
+      activeAccountId: undefined,
+    };
 
 function reducer(state, action) {
   switch (action.type) {
@@ -124,10 +127,19 @@ const PortfolioContext = createContext(undefined);
 export const PortfolioProvider = ({ children }) => {
   const [state, dispatch] = useReducer(reducer, initialState);
   const [ready, setReady] = useState(false);
-  const [usdToKrw, setUsdToKrw] = useState(FALLBACK_USD_KRW);
-  const [rateUpdatedAt, setRateUpdatedAt] = useState(null);
+  const [usdToKrw, setUsdToKrw] = useState(
+    SCREENSHOT_ENABLED ? SEED_RATE.usdToKrw : FALLBACK_USD_KRW,
+  );
+  const [rateUpdatedAt, setRateUpdatedAt] = useState(
+    SCREENSHOT_ENABLED ? SEED_RATE.updatedAt : null,
+  );
 
   useEffect(() => {
+    if (SCREENSHOT_ENABLED) {
+      // 스크린샷 모드: 영구 저장소를 무시하고 시드 데이터를 그대로 사용
+      setReady(true);
+      return;
+    }
     (async () => {
       try {
         const [persisted, savedRate] = await Promise.all([loadState(), loadExchangeRate()]);
@@ -147,7 +159,7 @@ export const PortfolioProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    if (ready) {
+    if (ready && !SCREENSHOT_ENABLED) {
       saveState(state);
     }
   }, [state, ready]);

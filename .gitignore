@@ -2,6 +2,10 @@ node_modules/
 .expo/
 dist/
 npm-debug.*
+
+# Expo prebuild / CNG 로 생성되는 네이티브 프로젝트 (필요시 `expo prebuild` 로 재생성)
+/ios/
+/android/
 *.jks
 *.p8
 *.p12

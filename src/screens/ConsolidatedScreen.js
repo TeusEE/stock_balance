@@ -9,12 +9,13 @@ import { formatCurrency, formatPercent } from '@/utils/format';
 import { DonutChart } from '@/components/DonutChart';
 import { ExportButtons } from '@/components/ExportButtons';
 import { buildConsolidatedExport } from '@/utils/exportData';
+import { screenshotConsolidatedViewMode, screenshotConsolidatedExpanded } from '@/utils/screenshot';
 
 export const ConsolidatedScreen = () => {
   const { state, usdToKrw, rateUpdatedAt } = usePortfolio();
   const [base, setBase] = useState('KRW');
-  const [viewMode, setViewMode] = useState('symbol'); // 'symbol' | 'group'
-  const [expandedGroups, setExpandedGroups] = useState({});
+  const [viewMode, setViewMode] = useState(screenshotConsolidatedViewMode()); // 'symbol' | 'group'
+  const [expandedGroups, setExpandedGroups] = useState(screenshotConsolidatedExpanded());
 
   const { totalBase, holdings } = useMemo(
     () => aggregateAcrossAccounts(state.accounts, base, usdToKrw),
