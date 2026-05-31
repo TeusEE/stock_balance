@@ -11,7 +11,10 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.stockbalance.app"
+      "bundleIdentifier": "com.stockbalance.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
       "package": "com.stockbalance.app"
@@ -21,6 +24,11 @@
     },
     "plugins": [
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "748e89e0-8700-4a42-93b5-738f41f291ab"
+      }
+    }
   }
 }
