@@ -67,6 +67,9 @@ npx expo start
 - iOS 시뮬레이터: `npm run ios`
 - Android 에뮬레이터: `npm run android`
 
+> **App Store 배포**(EAS Build/Submit, 로컬 Xcode 아카이브, 아이콘·버전 설정 등)는
+> [`docs/ios-deploy.md`](docs/ios-deploy.md) 참조.
+
 ### 4) App Store 스크린샷 캡처
 
 App Store 제출용 스크린샷을 **데모 데이터로 채워진 화면**에서 자동 캡처합니다.
