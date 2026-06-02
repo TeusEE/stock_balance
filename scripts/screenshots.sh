@@ -21,10 +21,17 @@ cd "$(dirname "$0")/.."
 ROOT="$(pwd)"
 
 # --- 설정 -------------------------------------------------------------------
-DEVICE="${DEVICE:-iPhone 17 Pro Max}"     # 6.9" 디스플레이 (1320×2868)
+DEVICE="${DEVICE:-iPhone 17 Pro Max}"     # 기본: 6.9" 아이폰 (1320×2868)
+#   iPad 예: DEVICE="iPad Air 13-inch (M4)"  → 13" 규격 (2064×2752)
 BUNDLE_ID="${BUNDLE_ID:-com.stockbalance.app}"
-OUT_DIR="${OUT_DIR:-$ROOT/screenshots}"
 METRO_PORT="${METRO_PORT:-8081}"
+
+# 출력 폴더: iPad는 screenshots/ipad/, 아이폰은 기존대로 screenshots/
+case "$DEVICE" in
+  *iPad*) DEFAULT_OUT_DIR="$ROOT/screenshots/ipad" ;;
+  *)      DEFAULT_OUT_DIR="$ROOT/screenshots" ;;
+esac
+OUT_DIR="${OUT_DIR:-$DEFAULT_OUT_DIR}"
 METRO_LOG="$(mktemp -t stockbalance-metro)"
 
 # 캡처할 씬 목록 (macOS 기본 bash 3.2 호환 위해 연관배열 대신 case 사용)
@@ -77,13 +84,21 @@ xcrun simctl status_bar "$UDID" override \
   --wifiBars 3 --cellularBars 4 2>/dev/null || true
 
 # --- 앱 빌드 & 설치 (없을 때만) ---------------------------------------------
-APP_INSTALLED=0
-xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" >/dev/null 2>&1 && APP_INSTALLED=1
-if [ "$APP_INSTALLED" -eq 0 ]; then
-  log "앱이 설치돼 있지 않아 빌드합니다 (expo run:ios — 최초 1회는 수 분 소요)"
-  EXPO_NO_TELEMETRY=1 npx expo run:ios --device "$UDID" --no-bundler
-else
+# 시뮬레이터 빌드(Debug-iphonesimulator)는 iPhone/iPad 공용이므로, 이미 만들어 둔
+# .app 이 있으면 재빌드 없이 다른 디바이스(예: iPad)에 그대로 설치해 재사용한다.
+if xcrun simctl get_app_container "$UDID" "$BUNDLE_ID" >/dev/null 2>&1; then
   log "앱이 이미 설치돼 있어 빌드를 건너뜁니다"
+else
+  PREBUILT_APP="$(find "$HOME/Library/Developer/Xcode/DerivedData" \
+    -path '*Build/Products/Debug-iphonesimulator/*.app' -maxdepth 8 -name '*.app' 2>/dev/null \
+    | grep -i stockbalance | head -1)"
+  if [ -n "$PREBUILT_APP" ]; then
+    log "기존 시뮬레이터 빌드 재사용: $(basename "$PREBUILT_APP") → 설치"
+    xcrun simctl install "$UDID" "$PREBUILT_APP"
+  else
+    log "설치된 앱/기존 빌드가 없어 빌드합니다 (expo run:ios — 최초 1회는 수 분 소요)"
+    EXPO_NO_TELEMETRY=1 npx expo run:ios --device "$UDID" --no-bundler
+  fi
 fi
 
 # --- Metro 시작 헬퍼 --------------------------------------------------------

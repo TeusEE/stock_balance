@@ -47,9 +47,17 @@ App Store 제출용 스크린샷을 **데모 데이터로 채워진 화면**에�
 ### 다른 디바이스로 캡처
 
 ```bash
-DEVICE="iPhone 16 Pro Max" ./scripts/screenshots.sh      # 6.9"
-DEVICE="iPhone 14 Plus"    ./scripts/screenshots.sh      # 6.5" (1242×2688, 선택 규격)
+DEVICE="iPhone 16 Pro Max"    ./scripts/screenshots.sh   # 6.9"
+DEVICE="iPhone 14 Plus"       ./scripts/screenshots.sh   # 6.5" (1242×2688, 선택 규격)
+DEVICE="iPad Air 13-inch (M4)" ./scripts/screenshots.sh  # iPad 13" (2048×2732, supportsTablet 앱 필수)
 ```
+
+> **출력 폴더는 디바이스별로 자동 분리됩니다.** 아이폰은 `screenshots/`,
+> iPad(`DEVICE`에 "iPad" 포함)는 `screenshots/ipad/` 에 저장됩니다.
+>
+> **빌드 재사용**: 시뮬레이터 빌드(`Debug-iphonesimulator/*.app`)는 iPhone/iPad 공용이라,
+> 한 번 빌드해 두면 다른 디바이스에서 캡처할 때 DerivedData의 기존 `.app`을 그대로 설치해
+> **재빌드 없이** 캡처합니다. (앱이 설치돼 있지도, 기존 빌드도 없을 때만 `expo run:ios` 수행)
 
 사용 가능한 시뮬레이터 목록:
 

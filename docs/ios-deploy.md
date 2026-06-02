@@ -150,8 +150,10 @@ eas build --platform ios --profile production
    - Bundle ID: **com.stockbalance.app** (목록에 없으면 EAS 빌드가 자동 등록했거나, Developer 포털에서 먼저 등록)
    - SKU: 임의 고유값 (예: `stock-balance-001`)
 3. 앱 정보 작성:
-   - **스크린샷** — `docs/screenshots.md` 참고. `./scripts/screenshots.sh`로 생성한
-     `screenshots/01~05-*.png`(6.9" 1320×2868)를 업로드. (6.9"만 필수)
+   - **스크린샷** — `docs/screenshots.md` 참고.
+     - 아이폰 6.9": `screenshots/01~05-*.png` (1320×2868)
+     - **iPad 13"**: `screenshots/ipad/01~05-*.png` (2048×2732) — `supportsTablet: true` 라 **iPad 스크린샷도 필수**
+       (`DEVICE="iPad Air 13-inch (M4)" ./scripts/screenshots.sh` 로 생성)
    - 설명, 키워드, 카테고리(예: Finance), 지원 URL, 개인정보 처리방침 URL
    - 연령 등급(App Store Rating) 설문
    - 가격(무료/유료)
