@@ -153,8 +153,104 @@ N일마다:  total = Σ value_i; value_i = total × 정규화비중_i   # 목표
 | `src/components/BacktestModal.js` | 세그먼트/칩 `보유 · 매주(~5) · 매월(~21) · 매분기(~63)` 추가, 선택 모드 수익률 + **보유 대비 차이(±%p)** 표시 |
 
 ### MVP 한계 (문서화)
-- 환차익·배당(adjclose 미제공 시)·거래비용·세금 미반영, 6개월·프리셋 N 고정.
-- 임의 N 입력, 거래비용/세금 반영, FX 포함은 **향후 과제**.
+- 배당(adjclose 미제공 시)·거래비용·세금 미반영, 6개월·프리셋 N 고정.
+- 환차익 포함은 **v2.2 에서 처리**. 임의 N 입력, 거래비용/세금 반영은 향후 과제.
+
+---
+
+## v2.2 — 환차익(FX) 포함 백테스트
+
+> **백엔드 변화 0, 새 함수 0.** 기존 `fetchHistoricalClose` 가 FX 심볼(`USDKRW=X`, `KRWUSD=X`)도
+> 그대로 받기 때문에 v2.2 는 기본적으로 `computeBacktest` 한 함수의 옵션 확장 + 두 화면의
+> `runBacktest` 가 FX 시리즈도 같이 fetch 하도록 묶어주는 작업이다.
+
+### 결합 수익률 모델
+
+```
+종목수익률_local_i = (endClose_i − startClose_i) / startClose_i              # v2.0 (자기 통화)
+fx_return_i       = (endFXRate_i − startFXRate_i) / startFXRate_i           # 종목통화 → base 환율 변화
+종목수익률_base_i = (1 + 종목수익률_local_i) × (1 + fx_return_i) − 1         # 결합
+포트폴리오수익률  = Σ ( 정규화비중_i × 종목수익률_base_i ) × 100  (%)
+```
+
+- 종목 currency == base currency 이면 `fx_return = 0` → v2.0 결과와 정확히 일치 (회귀 없음).
+- 결합은 곱(`×`)으로 — 환율 변화와 가격 변화의 복리 결합이 환산 수익률의 정의.
+- 정규화·제외·재정규화 규칙은 v2.0 과 동일.
+
+### 기준 통화(base) 결정
+
+| 화면 | base |
+|---|---|
+| 계좌 화면 (`AccountScreen`) | `activeAccount.currency` (계좌가 KRW 이면 KRW) |
+| 통합 화면 (`ConsolidatedScreen`) | 헤더의 현재 토글 값(`base` state, `'KRW'` \| `'USD'`) — 이미 존재. 토글 시 백테스트 캐시를 무효화해 재계산. |
+
+### FX 시리즈 조회
+
+기존 `fetchHistoricalClose(symbol, range)` 가 FX 심볼도 그대로 받는다(`USDKRW=X`).
+두 화면의 `runBacktest` 에서 종목 fetch 와 함께 **한 번의 `Promise.all` 로 같이 가져온다**:
+
+```js
+const weighted = buildAccountWeights(activeAccount); // 또는 buildConsolidatedWeights(holdings)
+const symbols  = uniqueSymbolsForBacktest(weighted);
+const base     = activeAccount.currency;             // 또는 헤더 토글의 base
+const fxPairs  = uniqueFXPairsForBacktest(weighted, priceMap, base);
+//                 → priceMap[symbol].currency 가 base 와 다를 때만 `{cur}{base}=X` 추가
+
+const [priceMap0, fxPriceMap] = await Promise.all([
+  fetchHistoricalCloses(symbols, '6mo'),
+  fetchHistoricalCloses(fxPairs, '6mo'),
+]);
+const fxMap = buildFXMap(priceMap0, fxPriceMap, base);
+const result = computeBacktest(weighted, priceMap0, { baseCurrency: base, fxMap });
+```
+
+> ⚠️ 종목 시리즈를 먼저 받아야 각 종목의 currency 를 알 수 있다.
+> 그래서 실제 코드에선 **두 단계**가 된다: ① 종목 fetch → ② fxPairs 결정 후 fetch.
+> 또는 `priceMap` 의 currency 기반으로 fxPairs 를 빌드해 두 fetch 를 묶거나, 종목 currency 가
+> 항목에 캐시되어 있으면 (현재 `item.currency` 가 있음) 한 번에 끝낼 수 있다 — 후자가 권장.
+
+### 신규 함수 (`src/utils/backtest.js` 추가)
+
+| 함수 | 역할 |
+|---|---|
+| `uniqueFXPairsForBacktest(weighted, base)` | `weighted[i].currency` 가 `base` 와 다른 종목들의 통화를 모아 `{cur}{base}=X` 유니크 배열로 반환. 종목의 currency 가 없으면 무시(이미 priceMap 으로 보정 가능). |
+| `buildFXMap(priceMap, fxPriceMap, base)` | `{ [currency]: { startFXRate, endFXRate } }` 형태로 정규화. base==currency 인 경우는 `{ startFXRate: 1, endFXRate: 1 }` 로 주입. |
+| `computeBacktest(weighted, priceMap, options?)` | **시그니처 확장**: `options = { baseCurrency, fxMap }` 가 주어지면 결합 수익률 사용, 없으면 v2.0 동작 그대로(회귀 0). |
+
+`buildAccountWeights` / `buildConsolidatedWeights` 에 `currency` 필드를 추가해 흘려보낸다
+(이미 데이터에 있음 — `item.currency`, `holdings[].currency` 는 통합에서 추가 필요).
+
+### 화면 변경
+
+- **`src/screens/AccountScreen.js`**: `runBacktest` 에서 `account.currency` 를 base 로 사용,
+  FX pair 도 같이 fetch, `computeBacktest` 에 `{ baseCurrency, fxMap }` 전달. 모달 title 에 base 표시.
+- **`src/screens/ConsolidatedScreen.js`**: 헤더 `base` toggle 값을 그대로 base 로 사용. 토글 변경 시
+  `setBacktestResult(null)` (캐시 무효화) — 이미 holdings 변경 시 무효화하는 useEffect 가 있으니
+  의존 배열에 `base` 추가만 하면 됨.
+- **`src/components/BacktestModal.js`**: `total` 라벨에 base 통화 표시("(KRW 기준)").
+  `excluded` 에 `'no-fx-data'` 사유 라벨 추가.
+
+### 결측·예외 처리
+
+- **FX 시리즈 결측**: 해당 종목 자체를 **제외 + 경고**(`reason: 'no-fx-data'`). 자기 통화 폴백은
+  부정확한 결과를 "정답인 양" 보여주는 신호 오류라 채택하지 않는다.
+- **종목 currency 누락**: priceMap 의 `series.currency` 를 신뢰 (v8 chart meta 가 보장).
+  거기도 없으면 `no-fx-data` 로 처리.
+
+### 테스트 (`src/utils/__tests__/backtest.test.js` 확장)
+
+| 케이스 | 기대 |
+|---|---|
+| base==currency (KRW 계좌, KRW 종목, fxMap 비어 있음) | v2.0 과 동일 결과 (회귀 0 확인) |
+| KRW 계좌 + USD 종목 (`fx_return = -5%`, `stock = +10%`) | `(1.10 × 0.95) − 1 = 4.5%` 일치 |
+| 한 종목만 FX 결측 | 해당 종목만 `excluded({reason:'no-fx-data'})`, 나머지로 재정규화 |
+| 옵션 없이 호출 (`computeBacktest(weighted, priceMap)`) | v2.0 동작 그대로 |
+
+### MVP 한계 (문서화)
+
+- 6개월·일별 종가 기준. FX 종가는 동일 영업일 매칭(주말/휴장 차이는 첫·끝 유효 종가 정책으로 흡수).
+- 배당·거래비용 미반영(v2 한계 그대로 승계).
+- 거래소 통화가 v8 meta 와 불일치하는 ETF(예: 호스팅 통화와 거래 통화가 다른 케이스)는 향후 보강.
 
 ---
 
@@ -263,6 +359,13 @@ create table shared_portfolios (
   단일 종목이면 보유=리밸런싱, `alignSeries` 공통축/forward-fill 정렬.
 - 시뮬레이터: 모달 세그먼트(보유·매주·매월·매분기) 전환 시 수익률과 "보유 대비 ±%p"가 바뀌는지 확인.
 
+**v2.2 (환차익 포함)**
+- `npm test` — `computeBacktest` 옵션 없이 호출 = v2.0 결과 그대로(회귀 0 확인),
+  KRW 계좌 + USD 종목 결합식((1.10×0.95)−1=4.5%) 일치, FX 결측 한 종목만 `no-fx-data` 로 분리·재정규화.
+- `npm run test:live:backtest` — `USDKRW=X` 가 실 응답으로 잡히는지(기존 라이브 스크립트에 케이스 추가 권장).
+- 시뮬레이터: 통합 화면 헤더의 KRW/USD 토글을 바꾸면 백테스트 캐시가 무효화되고 결과가 바뀌는지,
+  모달 라벨에 "(KRW 기준)" / "(USD 기준)" 이 표시되는지 확인.
+
 **v3 (공유 + 순위판)**
 - `npm test` — `shareSerialize`가 금액/보유수량을 절대 포함하지 않음을 단위 테스트로 검증.
 - `npx expo start` 실기기: 공유하기 → Supabase 대시보드에서 row 확인 → 다른 기기에서 공유 탭 노출 확인.
@@ -285,8 +388,15 @@ create table shared_portfolios (
 7. `backtest.js`에 `alignSeries` + `simulate(weighted, seriesMap, {intervalDays})` 추가 (+ 테스트).
 8. `BacktestModal`에 보유/매주/매월/매분기 세그먼트 + "보유 대비 ±%p" 표시.
 
+**v2.2 (v2.1 완료 후) — 환차익 포함**
+9. `backtest.js`에 `uniqueFXPairsForBacktest` + `buildFXMap` + `computeBacktest` 옵션
+   (`baseCurrency`, `fxMap`) 확장 (+ 테스트 — 회귀 0, USD/KRW 결합 케이스, no-fx-data 제외).
+10. `AccountScreen.runBacktest` — base=`account.currency`, FX pair 같이 fetch, 옵션 전달.
+11. `ConsolidatedScreen.runBacktest` — base=헤더 토글값, base 변경 시 캐시 무효화 추가.
+12. `BacktestModal` 라벨에 base 통화 표시, `no-fx-data` reason 라벨 추가.
+
 **v3 (이후, Supabase 도입)**
-9. 공통 선결: Supabase 프로젝트 + 의존성 + `supabase.js` + 익명 로그인 + 개인정보 설문 갱신.
-10. `shareSerialize`(테스트) → `shareApi` → `AuthContext`/닉네임 → 공유 탭/뷰어.
-11. 순위판: `submitToLeaderboard`/`listLeaderboard` → 자랑하기 버튼(v2 `backtest.js` 재사용) → `LeaderboardScreen`.
-12. `roadmap.md`의 v2/v3 항목을 "구현 중/완료"로 갱신.
+13. 공통 선결: Supabase 프로젝트 + 의존성 + `supabase.js` + 익명 로그인 + 개인정보 설문 갱신.
+14. `shareSerialize`(테스트) → `shareApi` → `AuthContext`/닉네임 → 공유 탭/뷰어.
+15. 순위판: `submitToLeaderboard`/`listLeaderboard` → 자랑하기 버튼(v2 `backtest.js` 재사용) → `LeaderboardScreen`.
+16. `roadmap.md`의 v2/v3 항목을 "구현 중/완료"로 갱신.
