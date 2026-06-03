@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { usePortfolio } from '@/context/PortfolioContext';
@@ -8,7 +8,14 @@ import { colorAt, colors, radius, spacing } from '@/theme';
 import { formatCurrency, formatPercent } from '@/utils/format';
 import { DonutChart } from '@/components/DonutChart';
 import { ExportButtons } from '@/components/ExportButtons';
+import { BacktestModal } from '@/components/BacktestModal';
 import { buildConsolidatedExport } from '@/utils/exportData';
+import {
+  buildConsolidatedWeights,
+  computeBacktest,
+  uniqueSymbolsForBacktest,
+} from '@/utils/backtest';
+import { fetchHistoricalCloses } from '@/services/stockApi';
 import { screenshotConsolidatedViewMode, screenshotConsolidatedExpanded } from '@/utils/screenshot';
 
 export const ConsolidatedScreen = () => {
@@ -30,6 +37,40 @@ export const ConsolidatedScreen = () => {
   const toggleGroup = (key) => {
     setExpandedGroups((prev) => ({ ...prev, [key]: !prev[key] }));
   };
+
+  // 6개월 백테스트 — 통합 화면은 슬롯 1개. holdings 가 바뀌면 캐시 무효화.
+  const [backtestVisible, setBacktestVisible] = useState(false);
+  const [backtestResult, setBacktestResult] = useState(null);
+  const [backtestLoading, setBacktestLoading] = useState(false);
+  const [backtestError, setBacktestError] = useState(null);
+
+  useEffect(() => {
+    setBacktestResult(null);
+    setBacktestError(null);
+  }, [holdings]);
+
+  const runBacktest = useCallback(async () => {
+    const weighted = buildConsolidatedWeights(holdings);
+    const symbols = uniqueSymbolsForBacktest(weighted);
+    setBacktestLoading(true);
+    setBacktestError(null);
+    try {
+      const priceMap =
+        symbols.length === 0 ? {} : await fetchHistoricalCloses(symbols, '6mo');
+      setBacktestResult(computeBacktest(weighted, priceMap));
+    } catch (e) {
+      setBacktestError('과거 시세 조회에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setBacktestLoading(false);
+    }
+  }, [holdings]);
+
+  const openBacktest = useCallback(() => {
+    setBacktestVisible(true);
+    if (!backtestResult && !backtestLoading) {
+      runBacktest();
+    }
+  }, [backtestResult, backtestLoading, runBacktest]);
 
   const chartData = viewMode === 'symbol'
     ? holdings.map((h, i) => ({ value: h.percent, color: colorAt(i) }))
@@ -93,6 +134,13 @@ export const ConsolidatedScreen = () => {
             </Text>
           </View>
         </View>
+
+        {/* 6개월 백테스트 */}
+        {holdings.length > 0 && (
+          <Pressable style={styles.backtestBtn} onPress={openBacktest}>
+            <Text style={styles.backtestBtnText}>6개월 백테스트</Text>
+          </Pressable>
+        )}
 
         {/* 그룹별 범례 (그룹 모드일 때) */}
         {viewMode === 'group' && groups.length > 0 && (
@@ -201,6 +249,16 @@ export const ConsolidatedScreen = () => {
           </View>
         )}
       </ScrollView>
+
+      <BacktestModal
+        visible={backtestVisible}
+        onClose={() => setBacktestVisible(false)}
+        title="통합 포트폴리오 · 6개월 백테스트"
+        result={backtestResult}
+        loading={backtestLoading}
+        error={backtestError}
+        onRefresh={runBacktest}
+      />
     </SafeAreaView>
   );
 };
@@ -339,4 +397,11 @@ const styles = StyleSheet.create({
   subPercent: { color: colors.text, fontSize: 13, fontWeight: '600' },
 
   exportSection: { marginTop: spacing.md, gap: spacing.sm },
+  backtestBtn: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    alignItems: 'center',
+  },
+  backtestBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
 });

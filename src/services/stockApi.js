@@ -100,3 +100,87 @@ export async function fetchExchangeRate(from = 'USD', to = 'KRW') {
   const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
   return typeof price === 'number' ? price : null;
 }
+
+// ───────────────────────────────────────────────────────────────────
+// 백테스트용 과거 시세 (v2)
+// ───────────────────────────────────────────────────────────────────
+
+/**
+ * v8 chart 응답에서 일별 종가 시리즈를 파싱해, 첫 유효 종가와 마지막
+ * 유효 종가를 추출합니다. (closes 배열에는 중간에 null 이 섞일 수 있어
+ * front/back 에서 첫 number 값을 찾는다.)
+ *
+ * 반환: { symbol, currency, startClose, endClose, startTs, endTs } 또는 null
+ */
+export function parseChartSeries(data, requestedSymbol) {
+  const result = data?.chart?.result?.[0];
+  const meta = result?.meta;
+  const timestamps = result?.timestamp;
+  const closes = result?.indicators?.quote?.[0]?.close;
+  if (!meta || !Array.isArray(timestamps) || !Array.isArray(closes)) return null;
+  if (timestamps.length === 0 || closes.length === 0) return null;
+
+  let startIdx = -1;
+  for (let i = 0; i < closes.length; i++) {
+    if (typeof closes[i] === 'number' && isFinite(closes[i])) {
+      startIdx = i;
+      break;
+    }
+  }
+  let endIdx = -1;
+  for (let i = closes.length - 1; i >= 0; i--) {
+    if (typeof closes[i] === 'number' && isFinite(closes[i])) {
+      endIdx = i;
+      break;
+    }
+  }
+  if (startIdx === -1 || endIdx === -1 || startIdx === endIdx) return null;
+
+  return {
+    symbol: meta.symbol ?? requestedSymbol,
+    currency: meta.currency,
+    startClose: closes[startIdx],
+    endClose: closes[endIdx],
+    startTs: timestamps[startIdx],
+    endTs: timestamps[endIdx],
+  };
+}
+
+/**
+ * 한 심볼의 6개월(기본) 일별 종가 시리즈에서 첫·끝 유효 종가를 가져옵니다.
+ * 실패 시 null.
+ */
+export async function fetchHistoricalClose(symbol, range = '6mo') {
+  const url = `${CHART_URL}/${encodeURIComponent(symbol)}?interval=1d&range=${encodeURIComponent(
+    range,
+  )}`;
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  if (!res.ok) {
+    throw new Error(`Historical fetch failed: ${res.status}`);
+  }
+  const data = await res.json();
+  return parseChartSeries(data, symbol);
+}
+
+/**
+ * 여러 심볼의 과거 종가 시리즈를 병렬로 가져옵니다.
+ * `fetchQuotes` 와 동일하게 일부 심볼 실패는 무시하고 성공한 것만 맵으로 반환.
+ */
+export async function fetchHistoricalCloses(symbols, range = '6mo') {
+  if (!symbols || symbols.length === 0) return {};
+  const entries = await Promise.all(
+    symbols.map(async (symbol) => {
+      try {
+        const series = await fetchHistoricalClose(symbol, range);
+        return series ? [symbol, series] : null;
+      } catch {
+        return null;
+      }
+    }),
+  );
+  const out = {};
+  for (const entry of entries) {
+    if (entry) out[entry[0]] = entry[1];
+  }
+  return out;
+}

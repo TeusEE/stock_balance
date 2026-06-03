@@ -1,4 +1,10 @@
-import { fetchQuote, fetchQuotes } from '../stockApi';
+import {
+  fetchHistoricalClose,
+  fetchHistoricalCloses,
+  fetchQuote,
+  fetchQuotes,
+  parseChartSeries,
+} from '../stockApi';
 
 // 실제 삼성전자(005930.KS) v8 chart 응답을 본뜬 mock.
 // regularMarketPrice 는 2026-05-27 기준 실제 시세(307,000원)를 반영.
@@ -92,5 +98,106 @@ describe('fetchQuote (단일 종목)', () => {
     );
     const quote = await fetchQuote('005930.KS');
     expect(quote).toBeNull();
+  });
+});
+
+// 6개월 시리즈 mock — 중간에 null(휴장/결측)이 섞여 있어도 첫·끝 유효 종가를 뽑아야 함
+function samsungSeriesResponse() {
+  return {
+    chart: {
+      result: [
+        {
+          meta: { currency: 'KRW', symbol: '005930.KS' },
+          timestamp: [1700000000, 1700086400, 1700172800, 1700259200, 1700345600],
+          indicators: {
+            quote: [
+              { close: [null, 70000, 72000, null, 78000] },
+            ],
+          },
+        },
+      ],
+      error: null,
+    },
+  };
+}
+
+describe('parseChartSeries (백테스트용 과거 종가)', () => {
+  test('중간 null 을 건너뛰고 첫·끝 유효 종가를 추출한다', () => {
+    const s = parseChartSeries(samsungSeriesResponse(), '005930.KS');
+    expect(s).not.toBeNull();
+    expect(s.symbol).toBe('005930.KS');
+    expect(s.currency).toBe('KRW');
+    expect(s.startClose).toBe(70000);
+    expect(s.endClose).toBe(78000);
+  });
+
+  test('timestamps/closes 가 비었거나 모두 null 이면 null', () => {
+    const empty = parseChartSeries(
+      { chart: { result: [{ meta: { currency: 'KRW' }, timestamp: [], indicators: { quote: [{ close: [] }] } }] } },
+      'X',
+    );
+    expect(empty).toBeNull();
+    const allNull = parseChartSeries(
+      {
+        chart: {
+          result: [
+            {
+              meta: { currency: 'KRW' },
+              timestamp: [1, 2, 3],
+              indicators: { quote: [{ close: [null, null, null] }] },
+            },
+          ],
+        },
+      },
+      'X',
+    );
+    expect(allNull).toBeNull();
+  });
+
+  test('첫 유효값과 끝 유효값이 같은 인덱스(1개뿐)면 null — 수익률 계산 불가', () => {
+    const single = parseChartSeries(
+      {
+        chart: {
+          result: [
+            {
+              meta: { currency: 'KRW' },
+              timestamp: [1, 2, 3],
+              indicators: { quote: [{ close: [null, 1000, null] }] },
+            },
+          ],
+        },
+      },
+      'X',
+    );
+    expect(single).toBeNull();
+  });
+});
+
+describe('fetchHistoricalCloses (병렬·부분실패)', () => {
+  test('range=6mo&interval=1d 로 chart 엔드포인트를 호출한다', async () => {
+    global.fetch = jest.fn(() => okResponse(samsungSeriesResponse()));
+    await fetchHistoricalClose('005930.KS', '6mo');
+    const url = global.fetch.mock.calls[0][0];
+    expect(url).toContain('/v8/finance/chart/005930.KS');
+    expect(url).toContain('interval=1d');
+    expect(url).toContain('range=6mo');
+  });
+
+  test('일부 심볼이 실패해도 성공한 심볼은 반환한다', async () => {
+    global.fetch = jest.fn((url) => {
+      if (String(url).includes('005930.KS')) return okResponse(samsungSeriesResponse());
+      return errorResponse(404);
+    });
+    const map = await fetchHistoricalCloses(['005930.KS', 'NOPE.X'], '6mo');
+    expect(map['005930.KS'].startClose).toBe(70000);
+    expect(map['005930.KS'].endClose).toBe(78000);
+    expect(map['NOPE.X']).toBeUndefined();
+  });
+
+  test('빈 배열이면 네트워크 호출 없이 빈 객체', async () => {
+    global.fetch = jest.fn();
+    const map = await fetchHistoricalCloses([], '6mo');
+    expect(map).toEqual({});
+    expect(global.fetch).not.toHaveBeenCalled();
   });
 });

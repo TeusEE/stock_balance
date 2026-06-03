@@ -32,6 +32,10 @@ iOS(아이폰)와 Android(갤럭시) 모두에서 동작합니다.
   - `JSON 공유`: OS 기본 공유 시트로 메모/메일/메신저 등 다른 앱으로 전송
   - `JSON 복사`: 클립보드에 복사 → 어디든 붙여넣기
   - 계좌 내보내기에는 종목별 권장 매수 수량/예상 매수금액까지 포함됩니다.
+- **6개월 백테스트** (v2.0) — 현재 포트폴리오 구성을 6개월 전에 그대로 들고 있었다면의 수익률.
+  - 계좌별 / 통합 양쪽 모두 지원. Rebalance 카드 아래 / 통합 요약 아래 "6개월 백테스트" 버튼.
+  - 비중 가중 + 종목 자기 통화 기준(환차익 미반영). 결측 종목은 자동 제외 후 비중 재정규화.
+  - 결과는 **모달 캐시**됨 — 모달을 닫았다 다시 열어도 유지, 새로고침 버튼 누를 때만 재조회.
 
 ## 화면 구성
 
@@ -118,11 +122,12 @@ npm test
 **라이브 검증 (실제 Yahoo Finance 호출, 네트워크 필요)**
 
 ```bash
-npm run test:live
+npm run test:live              # 현재가 / 검색 검증 (삼성전자)
+npm run test:live:backtest     # 6개월 과거 종가 검증 (삼성전자 + AAPL)
 ```
 
-`scripts/check-live-price.js`가 Node 네이티브 fetch로 실제 `stockApi.js`를 호출해
-삼성전자의 **현재가를 실제로 가져와 출력**하고 검증합니다.
+`scripts/check-live-price.js` / `scripts/check-historical-close.js`가 Node 네이티브 fetch로
+실제 `stockApi.js`를 호출해 시세·6개월 시리즈를 가져와 출력하고 검증합니다.
 
 > ⚠️ 이 라이브 검증은 jest로 하지 않습니다. jest(jest-expo)는 React Native용 fetch
 > 폴리필을 전역에 설치해 실제 네트워크를 타지 못하기 때문입니다. 그래서 실제 API 검증은

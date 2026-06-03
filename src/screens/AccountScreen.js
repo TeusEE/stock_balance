@@ -19,8 +19,14 @@ import { formatCurrency, formatPercent } from '@/utils/format';
 import { isValidAllocation, sumTargetPercent } from '@/utils/aggregate';
 import { computeAccountRebalance } from '@/utils/rebalance';
 import { buildAccountExport } from '@/utils/exportData';
+import {
+  buildAccountWeights,
+  computeBacktest,
+  uniqueSymbolsForBacktest,
+} from '@/utils/backtest';
+import { BacktestModal } from '@/components/BacktestModal';
 import { categoryColor, categoryLabel } from '@/constants/categories';
-import { fetchExchangeRate, fetchQuotes } from '@/services/stockApi';
+import { fetchExchangeRate, fetchHistoricalCloses, fetchQuotes } from '@/services/stockApi';
 import { SCREENSHOT_ENABLED, screenshotEditorOpen } from '@/utils/screenshot';
 
 export const AccountScreen = () => {
@@ -51,6 +57,18 @@ export const AccountScreen = () => {
   const [nameInput, setNameInput] = useState('');
   const [refreshing, setRefreshing] = useState(false);
   const autoRefreshedRef = useRef(new Set());
+
+  // 6개월 백테스트 — 결과 캐시는 화면 상태로 보관(모달 닫혔다 열려도 유지),
+  // activeAccount 가 바뀌면 무효화한다.
+  const [backtestVisible, setBacktestVisible] = useState(false);
+  const [backtestResult, setBacktestResult] = useState(null);
+  const [backtestLoading, setBacktestLoading] = useState(false);
+  const [backtestError, setBacktestError] = useState(null);
+
+  useEffect(() => {
+    setBacktestResult(null);
+    setBacktestError(null);
+  }, [activeAccount?.id]);
 
   useEffect(() => {
     if (activeAccount) {
@@ -102,6 +120,30 @@ export const AccountScreen = () => {
   const handleRefreshPrices = useCallback(() => {
     refreshPrices(false);
   }, [refreshPrices]);
+
+  const runBacktest = useCallback(async () => {
+    if (!activeAccount) return;
+    const weighted = buildAccountWeights(activeAccount);
+    const symbols = uniqueSymbolsForBacktest(weighted);
+    setBacktestLoading(true);
+    setBacktestError(null);
+    try {
+      const priceMap =
+        symbols.length === 0 ? {} : await fetchHistoricalCloses(symbols, '6mo');
+      setBacktestResult(computeBacktest(weighted, priceMap));
+    } catch (e) {
+      setBacktestError('과거 시세 조회에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setBacktestLoading(false);
+    }
+  }, [activeAccount]);
+
+  const openBacktest = useCallback(() => {
+    setBacktestVisible(true);
+    if (!backtestResult && !backtestLoading) {
+      runBacktest();
+    }
+  }, [backtestResult, backtestLoading, runBacktest]);
 
   useEffect(() => {
     if (SCREENSHOT_ENABLED) return; // 스크린샷 모드: 시드 가격 고정 (네트워크 새로고침 안 함)
@@ -312,6 +354,12 @@ export const AccountScreen = () => {
           </View>
         )}
 
+        {activeAccount.items.length > 0 && (
+          <Pressable style={styles.backtestBtn} onPress={openBacktest}>
+            <Text style={styles.backtestBtnText}>6개월 백테스트</Text>
+          </Pressable>
+        )}
+
         <View style={styles.itemsHeader}>
           <Text style={styles.sectionTitle}>구성 항목</Text>
           <Pressable
@@ -471,6 +519,16 @@ export const AccountScreen = () => {
           }
         }}
       />
+
+      <BacktestModal
+        visible={backtestVisible}
+        onClose={() => setBacktestVisible(false)}
+        title={`${activeAccount.name} · 6개월 백테스트`}
+        result={backtestResult}
+        loading={backtestLoading}
+        error={backtestError}
+        onRefresh={runBacktest}
+      />
     </SafeAreaView>
   );
 };
@@ -609,6 +667,13 @@ const styles = StyleSheet.create({
   rebalanceLabel: { color: colors.textDim, fontSize: 14 },
   rebalanceValue: { color: colors.text, fontSize: 16, fontWeight: '700' },
   rebalanceHint: { color: colors.textDim, fontSize: 11, marginTop: spacing.xs },
+  backtestBtn: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    alignItems: 'center',
+  },
+  backtestBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
   exportSection: { marginTop: spacing.md, gap: spacing.sm },
   primaryBtn: {
     marginTop: spacing.lg,
