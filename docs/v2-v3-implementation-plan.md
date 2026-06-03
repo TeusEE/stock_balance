@@ -109,7 +109,7 @@ v1은 AsyncStorage에만 데이터를 저장하고 외부로 전송하지 않는
 
 ---
 
-## v2.1 (확장 · v2.0 완료 후) — N일 주기 리밸런싱 백테스트
+## v2.1 (확장 · v2.0 완료 후) — N일 주기 리밸런싱 백테스트 ✅ 구현 완료
 
 > v2.0이 "시작 시점 비중대로 사서 그대로 둔" **보유(buy-and-hold)** 수익률이라면,
 > v2.1은 "**N영업일마다 목표 비중으로 되돌렸다면**(많이 오른 건 팔고 빠진 건 더 사면) 얼마였을까"를
@@ -155,6 +155,17 @@ N일마다:  total = Σ value_i; value_i = total × 정규화비중_i   # 목표
 ### MVP 한계 (문서화)
 - 배당(adjclose 미제공 시)·거래비용·세금 미반영, 6개월·프리셋 N 고정.
 - 환차익 포함은 **v2.2 에서 처리**. 임의 N 입력, 거래비용/세금 반영은 향후 과제.
+
+### 진행 체크리스트
+
+- [x] `parseChartSeries` 전체 시리즈(`timestamps[]`/`closes[]`) 반환 + adjclose 우선 (+ 테스트)
+- [x] `backtest.js`: `alignSeries`(공통축·forward-fill·윈도우 절단) (+ 테스트)
+- [x] `backtest.js`: `simulate(weighted, seriesMap, { intervalDays })` — `null`=보유 (+ 테스트: 리밸런싱 보너스 / 단일 종목 동일 / N=∞ 일치)
+- [x] `BacktestModal`: 보유·매주·매월·매분기 세그먼트 + 보유 대비 ±%p 표시
+- [x] 두 화면(`AccountScreen`/`ConsolidatedScreen`): fetch 1회 → 4모드 결과 캐시
+- [x] `scripts/check-historical-close.js`: 시리즈 배열 검증 보강
+- [x] `npm test` 전체 통과 (42개: stockApi 14 + backtest 20 + rebalance 8)
+- [x] `roadmap.md` 의존 트리에 v2.1 ✅ 반영
 
 ---
 

@@ -154,6 +154,27 @@ describe('parseChartSeries (백테스트용 과거 종가)', () => {
     expect(allNull).toBeNull();
   });
 
+  test('유효 (timestamp, close) 쌍만 남긴 전체 시리즈를 반환한다 (v2.1)', () => {
+    const s = parseChartSeries(samsungSeriesResponse(), '005930.KS');
+    // null 인 index 0, 3 이 제거된 쌍
+    expect(s.timestamps).toEqual([1700086400, 1700172800, 1700345600]);
+    expect(s.closes).toEqual([70000, 72000, 78000]);
+    // startClose/endClose 는 시리즈 첫/끝에서 파생
+    expect(s.startClose).toBe(s.closes[0]);
+    expect(s.endClose).toBe(s.closes[s.closes.length - 1]);
+  });
+
+  test('adjclose(조정 종가)가 있으면 quote close 보다 우선 사용한다 (v2.1 — 배당 반영)', () => {
+    const data = samsungSeriesResponse();
+    data.chart.result[0].indicators.adjclose = [
+      { close: [null, 69000, 71000, null, 77000] },
+    ];
+    const s = parseChartSeries(data, '005930.KS');
+    expect(s.startClose).toBe(69000);
+    expect(s.endClose).toBe(77000);
+    expect(s.closes).toEqual([69000, 71000, 77000]);
+  });
+
   test('첫 유효값과 끝 유효값이 같은 인덱스(1개뿐)면 null — 수익률 계산 불가', () => {
     const single = parseChartSeries(
       {

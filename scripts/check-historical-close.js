@@ -61,6 +61,22 @@ async function main() {
     check(typeof s.endClose === 'number' && s.endClose > 0, '종료 종가 양수');
     check(s.currency === 'KRW', '통화가 KRW');
     check(s.endTs > s.startTs, '종료 시각 > 시작 시각');
+
+    // v2.1 — 리밸런싱 시뮬레이션용 전체 시리즈 배열 검증
+    console.log(`     → 시리즈 길이: ${s.closes?.length}일`);
+    check(Array.isArray(s.timestamps) && Array.isArray(s.closes), '전체 시리즈 배열 반환');
+    check(s.timestamps.length === s.closes.length, 'timestamps/closes 길이 일치');
+    check(s.closes.length >= 100, '6개월 영업일 수가 100일 이상 (~126일 기대)');
+    check(
+      s.closes.every((c) => typeof c === 'number' && isFinite(c) && c > 0),
+      '모든 종가가 양수 (null 쌍 제거됨)',
+    );
+    check(
+      s.timestamps.every((t, i) => i === 0 || t > s.timestamps[i - 1]),
+      'timestamps 가 단조 증가',
+    );
+    check(s.startClose === s.closes[0] && s.endClose === s.closes[s.closes.length - 1],
+      'startClose/endClose 가 시리즈 첫/끝과 일치');
   }
 
   console.log(`\n[2] fetchHistoricalCloses(['${SAMSUNG}', '${APPLE}', 'NOPE.X'], '6mo')`);

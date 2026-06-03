@@ -106,43 +106,48 @@ export async function fetchExchangeRate(from = 'USD', to = 'KRW') {
 // ───────────────────────────────────────────────────────────────────
 
 /**
- * v8 chart 응답에서 일별 종가 시리즈를 파싱해, 첫 유효 종가와 마지막
- * 유효 종가를 추출합니다. (closes 배열에는 중간에 null 이 섞일 수 있어
- * front/back 에서 첫 number 값을 찾는다.)
+ * v8 chart 응답에서 일별 종가 시리즈를 파싱합니다.
  *
- * 반환: { symbol, currency, startClose, endClose, startTs, endTs } 또는 null
+ * - 배당/분할 조정 종가(`indicators.adjclose`)가 있으면 우선 사용하고,
+ *   없으면 `indicators.quote[0].close` 로 폴백합니다. (v2.1 — 배당 일부 반영)
+ * - closes 배열에는 휴장일 등으로 중간에 null 이 섞일 수 있어, 유효한
+ *   (timestamp, close) 쌍만 남긴 전체 시리즈를 함께 반환합니다.
+ * - `startClose`/`endClose` 는 시리즈의 첫/마지막 값에서 파생됩니다 (v2.0 호환).
+ *
+ * 반환: { symbol, currency, startClose, endClose, startTs, endTs,
+ *         timestamps[], closes[] } 또는 null (유효 종가 2개 미만)
  */
 export function parseChartSeries(data, requestedSymbol) {
   const result = data?.chart?.result?.[0];
   const meta = result?.meta;
   const timestamps = result?.timestamp;
-  const closes = result?.indicators?.quote?.[0]?.close;
-  if (!meta || !Array.isArray(timestamps) || !Array.isArray(closes)) return null;
-  if (timestamps.length === 0 || closes.length === 0) return null;
+  const adjCloses = result?.indicators?.adjclose?.[0]?.close;
+  const quoteCloses = result?.indicators?.quote?.[0]?.close;
+  const rawCloses = Array.isArray(adjCloses) ? adjCloses : quoteCloses;
+  if (!meta || !Array.isArray(timestamps) || !Array.isArray(rawCloses)) return null;
+  if (timestamps.length === 0 || rawCloses.length === 0) return null;
 
-  let startIdx = -1;
-  for (let i = 0; i < closes.length; i++) {
-    if (typeof closes[i] === 'number' && isFinite(closes[i])) {
-      startIdx = i;
-      break;
+  const validTs = [];
+  const validCloses = [];
+  const len = Math.min(timestamps.length, rawCloses.length);
+  for (let i = 0; i < len; i++) {
+    const c = rawCloses[i];
+    if (typeof c === 'number' && isFinite(c) && typeof timestamps[i] === 'number') {
+      validTs.push(timestamps[i]);
+      validCloses.push(c);
     }
   }
-  let endIdx = -1;
-  for (let i = closes.length - 1; i >= 0; i--) {
-    if (typeof closes[i] === 'number' && isFinite(closes[i])) {
-      endIdx = i;
-      break;
-    }
-  }
-  if (startIdx === -1 || endIdx === -1 || startIdx === endIdx) return null;
+  if (validCloses.length < 2) return null;
 
   return {
     symbol: meta.symbol ?? requestedSymbol,
     currency: meta.currency,
-    startClose: closes[startIdx],
-    endClose: closes[endIdx],
-    startTs: timestamps[startIdx],
-    endTs: timestamps[endIdx],
+    startClose: validCloses[0],
+    endClose: validCloses[validCloses.length - 1],
+    startTs: validTs[0],
+    endTs: validTs[validTs.length - 1],
+    timestamps: validTs,
+    closes: validCloses,
   };
 }
 

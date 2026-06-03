@@ -21,10 +21,10 @@ import { computeAccountRebalance } from '@/utils/rebalance';
 import { buildAccountExport } from '@/utils/exportData';
 import {
   buildAccountWeights,
-  computeBacktest,
+  simulate,
   uniqueSymbolsForBacktest,
 } from '@/utils/backtest';
-import { BacktestModal } from '@/components/BacktestModal';
+import { BACKTEST_MODES, BacktestModal } from '@/components/BacktestModal';
 import { categoryColor, categoryLabel } from '@/constants/categories';
 import { fetchExchangeRate, fetchHistoricalCloses, fetchQuotes } from '@/services/stockApi';
 import { SCREENSHOT_ENABLED, screenshotEditorOpen } from '@/utils/screenshot';
@@ -61,12 +61,12 @@ export const AccountScreen = () => {
   // 6개월 백테스트 — 결과 캐시는 화면 상태로 보관(모달 닫혔다 열려도 유지),
   // activeAccount 가 바뀌면 무효화한다.
   const [backtestVisible, setBacktestVisible] = useState(false);
-  const [backtestResult, setBacktestResult] = useState(null);
+  const [backtestResults, setBacktestResults] = useState(null); // { hold, weekly, monthly, quarterly }
   const [backtestLoading, setBacktestLoading] = useState(false);
   const [backtestError, setBacktestError] = useState(null);
 
   useEffect(() => {
-    setBacktestResult(null);
+    setBacktestResults(null);
     setBacktestError(null);
   }, [activeAccount?.id]);
 
@@ -130,7 +130,12 @@ export const AccountScreen = () => {
     try {
       const priceMap =
         symbols.length === 0 ? {} : await fetchHistoricalCloses(symbols, '6mo');
-      setBacktestResult(computeBacktest(weighted, priceMap));
+      // fetch 1회 → 모드별(보유/매주/매월/매분기) 시뮬레이션은 순수 계산 (v2.1)
+      const results = {};
+      for (const m of BACKTEST_MODES) {
+        results[m.key] = simulate(weighted, priceMap, { intervalDays: m.intervalDays });
+      }
+      setBacktestResults(results);
     } catch (e) {
       setBacktestError('과거 시세 조회에 실패했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
@@ -140,10 +145,10 @@ export const AccountScreen = () => {
 
   const openBacktest = useCallback(() => {
     setBacktestVisible(true);
-    if (!backtestResult && !backtestLoading) {
+    if (!backtestResults && !backtestLoading) {
       runBacktest();
     }
-  }, [backtestResult, backtestLoading, runBacktest]);
+  }, [backtestResults, backtestLoading, runBacktest]);
 
   useEffect(() => {
     if (SCREENSHOT_ENABLED) return; // 스크린샷 모드: 시드 가격 고정 (네트워크 새로고침 안 함)
@@ -524,7 +529,7 @@ export const AccountScreen = () => {
         visible={backtestVisible}
         onClose={() => setBacktestVisible(false)}
         title={`${activeAccount.name} · 6개월 백테스트`}
-        result={backtestResult}
+        results={backtestResults}
         loading={backtestLoading}
         error={backtestError}
         onRefresh={runBacktest}

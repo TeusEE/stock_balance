@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -17,6 +17,17 @@ const REASON_LABEL = {
   'zero-weight': '비중 0',
 };
 
+/**
+ * v2.1 — 리밸런싱 주기 프리셋. key 는 화면(runBacktest)이 만드는
+ * results 객체의 키와 1:1 로 대응한다. intervalDays 는 영업일 기준.
+ */
+export const BACKTEST_MODES = [
+  { key: 'hold', label: '보유', intervalDays: null },
+  { key: 'weekly', label: '매주', intervalDays: 5 },
+  { key: 'monthly', label: '매월', intervalDays: 21 },
+  { key: 'quarterly', label: '매분기', intervalDays: 63 },
+];
+
 function returnColor(value) {
   if (value == null) return colors.textDim;
   if (value > 0) return colors.success;
@@ -31,22 +42,33 @@ function signedPercent(value) {
 }
 
 /**
- * 6개월 보유 백테스트 결과 모달.
+ * 6개월 백테스트 결과 모달 (보유 + N일 주기 리밸런싱).
  *
- * 캐시 정책: 결과(`result`)는 부모(화면) 상태로 보관되어 모달이 닫혔다
- * 다시 열려도 그대로 유지된다. 사용자가 "새로고침"을 누를 때만 onRefresh
- * 호출 → 부모가 fetch + result 갱신.
+ * 캐시 정책: 모드별 결과(`results` = { hold, weekly, monthly, quarterly })는
+ * 부모(화면) 상태로 보관되어 모달이 닫혔다 다시 열려도 그대로 유지된다.
+ * 사용자가 "새로고침"을 누를 때만 onRefresh 호출 → 부모가 fetch + results 갱신.
+ * 모드 전환은 캐시된 결과 간 전환이라 네트워크 호출이 없다.
  */
 export const BacktestModal = ({
   visible,
   onClose,
   title,
-  result,
+  results,
   loading,
   error,
   onRefresh,
 }) => {
+  const [modeKey, setModeKey] = useState('hold');
+  const mode = BACKTEST_MODES.find((m) => m.key === modeKey) ?? BACKTEST_MODES[0];
+  const result = results?.[mode.key];
+  const hold = results?.hold;
   const total = result?.totalReturnPercent;
+
+  // 보유 대비 차이 (%p) — 리밸런싱 모드에서만
+  const diffVsHold =
+    mode.key !== 'hold' && total != null && hold?.totalReturnPercent != null
+      ? total - hold.totalReturnPercent
+      : null;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent>
@@ -61,10 +83,31 @@ export const BacktestModal = ({
             </Pressable>
           </View>
 
+          {/* 리밸런싱 주기 세그먼트 */}
+          <View style={styles.modeRow}>
+            {BACKTEST_MODES.map((m) => (
+              <Pressable
+                key={m.key}
+                onPress={() => setModeKey(m.key)}
+                style={[styles.modeBtn, modeKey === m.key && styles.modeBtnActive]}
+              >
+                <Text
+                  style={[styles.modeText, modeKey === m.key && styles.modeTextActive]}
+                >
+                  {m.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
           <ScrollView contentContainerStyle={styles.body}>
             {/* 총 수익률 카드 */}
             <View style={styles.totalCard}>
-              <Text style={styles.totalLabel}>6개월 보유 수익률</Text>
+              <Text style={styles.totalLabel}>
+                {mode.key === 'hold'
+                  ? '6개월 보유 수익률'
+                  : `6개월 ${mode.label} 리밸런싱 수익률`}
+              </Text>
               {loading && !result ? (
                 <View style={{ paddingVertical: spacing.lg }}>
                   <ActivityIndicator color={colors.primary} />
@@ -72,6 +115,15 @@ export const BacktestModal = ({
               ) : (
                 <Text style={[styles.totalValue, { color: returnColor(total) }]}>
                   {total == null ? '계산 불가' : signedPercent(total)}
+                </Text>
+              )}
+              {diffVsHold != null && (
+                <Text style={[styles.diffText, { color: returnColor(diffVsHold) }]}>
+                  보유 대비 {diffVsHold > 0 ? '+' : ''}
+                  {diffVsHold.toFixed(2)}%p
+                  {result?.rebalanceCount != null
+                    ? ` · 리밸런싱 ${result.rebalanceCount}회`
+                    : ''}
                 </Text>
               )}
               {result && (
@@ -143,7 +195,9 @@ export const BacktestModal = ({
 
             {result && (
               <Text style={styles.note}>
-                * 종목 자기 통화 기준 수익률입니다. 환차익·배당·거래비용은 반영되지 않습니다.
+                * 종목 자기 통화 기준 수익률입니다. 환차익·거래비용·세금은 반영되지
+                않으며, 배당은 조정 종가 제공 시에만 반영됩니다. 리밸런싱은 영업일
+                기준·소수 주식 허용의 이상적 시뮬레이션입니다.
               </Text>
             )}
           </ScrollView>
@@ -177,6 +231,29 @@ const styles = StyleSheet.create({
   title: { color: colors.text, fontSize: 18, fontWeight: '700', flex: 1, marginRight: spacing.md },
   close: { color: colors.primary, fontSize: 16, fontWeight: '600' },
   body: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xl * 2, gap: spacing.md },
+
+  modeRow: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  modeBtn: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    backgroundColor: colors.cardAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  modeBtnActive: {
+    backgroundColor: colors.primaryDim,
+    borderColor: colors.primary,
+  },
+  modeText: { color: colors.textDim, fontSize: 13, fontWeight: '600' },
+  modeTextActive: { color: colors.text },
+  diffText: { fontSize: 13, fontWeight: '600' },
 
   totalCard: {
     backgroundColor: colors.card,

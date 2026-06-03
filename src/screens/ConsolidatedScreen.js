@@ -8,11 +8,11 @@ import { colorAt, colors, radius, spacing } from '@/theme';
 import { formatCurrency, formatPercent } from '@/utils/format';
 import { DonutChart } from '@/components/DonutChart';
 import { ExportButtons } from '@/components/ExportButtons';
-import { BacktestModal } from '@/components/BacktestModal';
+import { BACKTEST_MODES, BacktestModal } from '@/components/BacktestModal';
 import { buildConsolidatedExport } from '@/utils/exportData';
 import {
   buildConsolidatedWeights,
-  computeBacktest,
+  simulate,
   uniqueSymbolsForBacktest,
 } from '@/utils/backtest';
 import { fetchHistoricalCloses } from '@/services/stockApi';
@@ -40,12 +40,12 @@ export const ConsolidatedScreen = () => {
 
   // 6개월 백테스트 — 통합 화면은 슬롯 1개. holdings 가 바뀌면 캐시 무효화.
   const [backtestVisible, setBacktestVisible] = useState(false);
-  const [backtestResult, setBacktestResult] = useState(null);
+  const [backtestResults, setBacktestResults] = useState(null); // { hold, weekly, monthly, quarterly }
   const [backtestLoading, setBacktestLoading] = useState(false);
   const [backtestError, setBacktestError] = useState(null);
 
   useEffect(() => {
-    setBacktestResult(null);
+    setBacktestResults(null);
     setBacktestError(null);
   }, [holdings]);
 
@@ -57,7 +57,12 @@ export const ConsolidatedScreen = () => {
     try {
       const priceMap =
         symbols.length === 0 ? {} : await fetchHistoricalCloses(symbols, '6mo');
-      setBacktestResult(computeBacktest(weighted, priceMap));
+      // fetch 1회 → 모드별(보유/매주/매월/매분기) 시뮬레이션은 순수 계산 (v2.1)
+      const results = {};
+      for (const m of BACKTEST_MODES) {
+        results[m.key] = simulate(weighted, priceMap, { intervalDays: m.intervalDays });
+      }
+      setBacktestResults(results);
     } catch (e) {
       setBacktestError('과거 시세 조회에 실패했습니다. 잠시 후 다시 시도해주세요.');
     } finally {
@@ -67,10 +72,10 @@ export const ConsolidatedScreen = () => {
 
   const openBacktest = useCallback(() => {
     setBacktestVisible(true);
-    if (!backtestResult && !backtestLoading) {
+    if (!backtestResults && !backtestLoading) {
       runBacktest();
     }
-  }, [backtestResult, backtestLoading, runBacktest]);
+  }, [backtestResults, backtestLoading, runBacktest]);
 
   const chartData = viewMode === 'symbol'
     ? holdings.map((h, i) => ({ value: h.percent, color: colorAt(i) }))
@@ -254,7 +259,7 @@ export const ConsolidatedScreen = () => {
         visible={backtestVisible}
         onClose={() => setBacktestVisible(false)}
         title="통합 포트폴리오 · 6개월 백테스트"
-        result={backtestResult}
+        results={backtestResults}
         loading={backtestLoading}
         error={backtestError}
         onRefresh={runBacktest}
