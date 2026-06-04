@@ -1,6 +1,6 @@
 # iOS 배포 진행 상황
 
-> 마지막 업데이트: 2026-06-01
+> 마지막 업데이트: 2026-06-04
 > 브랜치: `claude/stock-portfolio-rebalancing-app-LDvJ3`
 > 관련 문서: [`docs/ios-deploy.md`](docs/ios-deploy.md) · [`docs/screenshots.md`](docs/screenshots.md)
 
@@ -20,6 +20,8 @@ App Store 배포 작업의 단계별 진행 상황을 기록합니다. 내일 �
 | 6 | **수출 규정(암호화) 선언** | `app.json`의 `ios.infoPlist.ITSAppUsesNonExemptEncryption: false` (표준 HTTPS만 사용 → 면제) |
 | 7 | **iOS production 빌드 성공** | EAS 클라우드 빌드 완료, `.ipa` 산출 (아래 참고) |
 | 8 | **심사 리젝션(2.1) 대응 문서** | `docs/app-review-notes.md` (영문 Notes 원본), `docs/privacy-policy.md`, `docs/walkthrough.md` |
+| 9 | **처리방침 URL 호스팅** | GitHub Pages(`/docs`) 활성화 → `https://teusee.github.io/stock_balance/privacy-policy.html` 정상 게시. App Store Connect에 URL + App Privacy("Data Not Collected") 등록 완료 |
+| 10 | **실기기 테스트 발견 버그 수정(1.0.1)** | 숫자패드 닫기 / 백테스트 항목 수정 반영 / 모달 배경 탭으로 닫기 — 자세한 내용은 [`CHANGELOG.md`](CHANGELOG.md) |
 
 ### 빌드 산출물
 - `.ipa`: https://expo.dev/artifacts/eas/wnEv52owwkwRsB6bY94ZYd.ipa
@@ -35,12 +37,19 @@ App Store 배포 작업의 단계별 진행 상황을 기록합니다. 내일 �
 > [`docs/privacy-policy.md`](docs/privacy-policy.md) ·
 > [`docs/walkthrough.md`](docs/walkthrough.md) 참조.
 
-### 1. 처리방침 URL 호스팅 (GitHub Pages)
-- [ ] GitHub > 레포 Settings > Pages → **Source: Deploy from a branch**,
-      Branch: 현재 브랜치, Folder: `/docs` 로 활성화
-- [ ] 1~2분 후 `https://teusee.github.io/stock_balance/privacy-policy.html`
-      가 200 으로 열리는지 다른 브라우저로 확인
-- [ ] App Store Connect → App Information → **Privacy Policy URL** 에 등록
+### 0. 수정된 코드로 새 빌드 (1.0.1) — 녹화·재제출 전 필수
+> 실기기 테스트에서 발견한 버그 수정(키보드/백테스트/모달)이 들어가 있어,
+> **고친 빌드로 다시 만들어** TestFlight 설치 → 녹화해야 한다. 자세한 변경: [`CHANGELOG.md`](CHANGELOG.md)
+- [ ] `eas build --platform ios --profile production --auto-submit`
+      (Expo·Apple 로그인 필요 → 터미널에서 직접 실행)
+- [ ] TestFlight 처리(10~30분) 후 아이폰에서 앱 **업데이트**
+- [ ] 종목 추가창에서 숫자 입력 → 빈 곳 탭 시 키보드 닫힘 / 저장 버튼 안 가려짐 확인
+
+### 1. 처리방침 URL 호스팅 (GitHub Pages) — ✅ 완료
+- [x] GitHub > 레포 Settings > Pages → **Source: Deploy from a branch**,
+      Branch: 현재 브랜치, Folder: `/docs`
+- [x] `https://teusee.github.io/stock_balance/privacy-policy.html` 정상 게시 확인
+- [x] App Store Connect → App Privacy → **Privacy Policy URL** 등록 + "Data Not Collected" 응답
 
 ### 2. 실기기 화면 녹화
 - [ ] `docs/walkthrough.md` 시나리오대로 iPhone 실기기에서 화면 기록(60~90초)
@@ -51,8 +60,8 @@ App Store 배포 작업의 단계별 진행 상황을 기록합니다. 내일 �
 - [ ] `[FILL IN]` 두 군데(테스트 디바이스, 처리방침 URL) 채우기
 - [ ] Notes 필드에 붙여넣기
 
-### 4. App Privacy 설문
-- [ ] 모든 데이터 카테고리 **"Data Not Collected"** 로 답변
+### 4. App Privacy 설문 — ✅ 완료
+- [x] 모든 데이터 카테고리 **"Data Not Collected"** 로 답변
       (근거: 권한 요청 0건, 외부 호스트는 Yahoo Finance 1곳뿐, AsyncStorage 로컬 저장만)
 
 ### 5. 마케팅 메타데이터 (기존 미해결)
