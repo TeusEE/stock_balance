@@ -87,7 +87,13 @@ export const ItemEditorModal = ({
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <Pressable style={styles.backdrop} onPress={Keyboard.dismiss}>
+        <Pressable
+          style={styles.backdrop}
+          onPress={() => {
+            Keyboard.dismiss();
+            onClose();
+          }}
+        >
           <Pressable style={styles.sheet} onPress={Keyboard.dismiss}>
           <View style={styles.header}>
             <Text style={styles.title}>{initial?.name ? '항목 편집' : '항목 추가'}</Text>

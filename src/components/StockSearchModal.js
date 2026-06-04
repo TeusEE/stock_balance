@@ -63,8 +63,8 @@ export const StockSearchModal = ({ visible, onClose, onSelect }) => {
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent>
-      <View style={styles.backdrop}>
-        <View style={styles.sheet}>
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={styles.sheet} onPress={() => {}}>
           <View style={styles.header}>
             <Text style={styles.title}>주식 / ETF 검색</Text>
             <Pressable onPress={onClose} hitSlop={8}>
@@ -107,8 +107,8 @@ export const StockSearchModal = ({ visible, onClose, onSelect }) => {
               ) : null
             }
           />
-        </View>
-      </View>
+        </Pressable>
+      </Pressable>
     </Modal>
   );
 };
