@@ -19,6 +19,7 @@ App Store 배포 작업의 단계별 진행 상황을 기록합니다. 내일 �
 | 5 | **EAS 프로젝트 링크** | `app.json`의 `extra.eas.projectId` = `748e89e0-8700-4a42-93b5-738f41f291ab` |
 | 6 | **수출 규정(암호화) 선언** | `app.json`의 `ios.infoPlist.ITSAppUsesNonExemptEncryption: false` (표준 HTTPS만 사용 → 면제) |
 | 7 | **iOS production 빌드 성공** | EAS 클라우드 빌드 완료, `.ipa` 산출 (아래 참고) |
+| 8 | **심사 리젝션(2.1) 대응 문서** | `docs/app-review-notes.md` (영문 Notes 원본), `docs/privacy-policy.md`, `docs/walkthrough.md` |
 
 ### 빌드 산출물
 - `.ipa`: https://expo.dev/artifacts/eas/wnEv52owwkwRsB6bY94ZYd.ipa
@@ -26,34 +27,50 @@ App Store 배포 작업의 단계별 진행 상황을 기록합니다. 내일 �
 
 ---
 
-## ⬜ 다음에 할 일 (이어서)
+## ⬜ 다음에 할 일 (이어서) — 2.1 리젝 응답
 
-### 1. App Store Connect 업로드
-```bash
-eas submit --platform ios --profile production
-```
-- 가장 최근 빌드를 업로드. 또는 `--url https://expo.dev/artifacts/eas/wnEv52owwkwRsB6bY94ZYd.ipa` 로 위 .ipa 직접 지정 가능.
-- 인증: **App Store Connect API Key** 권장 (ASC → Users and Access → Integrations).
-- 앱 레코드가 없으면 자동 생성 여부를 물어봄 → Yes 가능.
+> 첫 심사에서 **Guideline 2.1 Information Needed** 리젝션을 받음.
+> 아래는 그 응답 절차. 자세한 영문 Notes/처리방침/녹화 가이드는
+> [`docs/app-review-notes.md`](docs/app-review-notes.md) ·
+> [`docs/privacy-policy.md`](docs/privacy-policy.md) ·
+> [`docs/walkthrough.md`](docs/walkthrough.md) 참조.
 
-### 2. App Store Connect 메타데이터 (웹)
-https://appstoreconnect.apple.com → 앱:
-- [ ] 스크린샷 업로드 — `screenshots/01~05-*.png` (6.9" 필수)
+### 1. 처리방침 URL 호스팅 (GitHub Pages)
+- [ ] GitHub > 레포 Settings > Pages → **Source: Deploy from a branch**,
+      Branch: 현재 브랜치, Folder: `/docs` 로 활성화
+- [ ] 1~2분 후 `https://teusee.github.io/stock_balance/privacy-policy.html`
+      가 200 으로 열리는지 다른 브라우저로 확인
+- [ ] App Store Connect → App Information → **Privacy Policy URL** 에 등록
+
+### 2. 실기기 화면 녹화
+- [ ] `docs/walkthrough.md` 시나리오대로 iPhone 실기기에서 화면 기록(60~90초)
+- [ ] `.MOV` 파일을 App Store Connect → App Review Information → Attachments 에 첨부
+
+### 3. App Review Information Notes 작성
+- [ ] `docs/app-review-notes.md` 본문을 복사
+- [ ] `[FILL IN]` 두 군데(테스트 디바이스, 처리방침 URL) 채우기
+- [ ] Notes 필드에 붙여넣기
+
+### 4. App Privacy 설문
+- [ ] 모든 데이터 카테고리 **"Data Not Collected"** 로 답변
+      (근거: 권한 요청 0건, 외부 호스트는 Yahoo Finance 1곳뿐, AsyncStorage 로컬 저장만)
+
+### 5. 마케팅 메타데이터 (기존 미해결)
+- [ ] 스크린샷 업로드 — `screenshots/01~05-*.png` (6.9") + `screenshots/ipad/` (iPad)
 - [ ] 앱 설명 / 키워드 / 카테고리(Finance)
-- [ ] **개인정보 처리방침 URL** ⚠️ *심사 제출 필수 — 아직 준비 안 됨*
 - [ ] 지원(Support) URL
-- [ ] 개인정보 설문 → "데이터 미수집(Data Not Collected)" (서버 전송 없이 기기 저장만)
 - [ ] 연령 등급 설문
 
-### 3. 테스트 & 제출
-- [ ] (권장) **TestFlight**로 실기기 검증
-- [ ] 빌드 연결 → **심사 제출(Submit for Review)**
+### 6. 재제출
+- [ ] App Store Connect → Resolution Center 에서 **Reply** 하여 위 정보 전달
+- [ ] (필요 시) 새 빌드 업로드 후 그 빌드로 심사 대상 변경
 - [ ] 심사 통과 후 출시(자동/수동)
 
 ---
 
 ## 📌 남은 준비물 / 유의사항
-- **개인정보 처리방침 URL**: 심사 제출의 필수 항목. 간단한 정적 페이지라도 미리 준비 필요.
+- **개인정보 처리방침 URL**: 본문은 `docs/privacy-policy.md` 로 준비됨.
+  GitHub Pages 활성화로 URL 확보(위 1단계 참고).
 - **아이콘**: 현재 임시(1254×1254). 동작엔 문제없으나 최종본은 1024×1024 권장.
 - **버전 관리**: marketing 버전은 `app.json`의 `version`(현재 `1.0.0`)에서 직접 올림. 빌드 번호는 EAS가 자동 증가.
 - **로그인/빌드/제출**은 Apple 계정 인증이 필요해 터미널에서 직접 실행 (이 세션에선 프롬프트에 `!` 접두사로 실행 가능).
