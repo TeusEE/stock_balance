@@ -65,17 +65,26 @@ export const AccountScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const autoRefreshedRef = useRef(new Set());
 
-  // 6개월 백테스트 — 결과 캐시는 화면 상태로 보관(모달 닫혔다 열려도 유지),
-  // activeAccount 가 바뀌면 무효화한다.
+  // 6개월 백테스트 — 결과 캐시는 화면 상태로 보관(모달 닫혔다 열려도 유지).
+  // 백테스트 입력(심볼·종목명·목표비중)이 바뀌면 무효화한다. 계좌 전환뿐 아니라
+  // 같은 계좌 안에서 항목을 수정/추가/삭제한 경우에도 다시 계산되도록 한다.
   const [backtestVisible, setBacktestVisible] = useState(false);
   const [backtestResults, setBacktestResults] = useState(null); // { hold, weekly, monthly, quarterly }
   const [backtestLoading, setBacktestLoading] = useState(false);
   const [backtestError, setBacktestError] = useState(null);
 
+  const backtestSignature = useMemo(() => {
+    if (!activeAccount) return '';
+    const items = (activeAccount.items ?? [])
+      .map((it) => `${it.symbol ?? ''}:${it.name ?? ''}:${Number(it.targetPercent) || 0}`)
+      .join(',');
+    return `${activeAccount.id}|${items}`;
+  }, [activeAccount]);
+
   useEffect(() => {
     setBacktestResults(null);
     setBacktestError(null);
-  }, [activeAccount?.id]);
+  }, [backtestSignature]);
 
   useEffect(() => {
     if (activeAccount) {
