@@ -1,3 +1,7 @@
+---
+title: Privacy Policy — Stock Balance
+---
+
 # Privacy Policy — Stock Balance
 
 _Last updated: 2026-06-04_
