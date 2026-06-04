@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
+  InputAccessoryView,
+  Keyboard,
   Modal,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -10,6 +13,10 @@ import {
 import { colors, radius, spacing } from '@/theme';
 import { CATEGORIES, DEFAULT_CATEGORY } from '@/constants/categories';
 import { StockSearchModal } from './StockSearchModal';
+
+const NUMERIC_ACCESSORY_ID = 'itemEditorNumericDone';
+const numericAccessoryProps =
+  Platform.OS === 'ios' ? { inputAccessoryViewID: NUMERIC_ACCESSORY_ID } : {};
 
 export const ItemEditorModal = ({
   visible,
@@ -148,6 +155,7 @@ export const ItemEditorModal = ({
               placeholder="예: 300"
               placeholderTextColor={colors.textDim}
               keyboardType="decimal-pad"
+              {...numericAccessoryProps}
               style={[styles.input, { flex: 1 }]}
             />
             <View style={styles.currencyToggle}>
@@ -177,6 +185,7 @@ export const ItemEditorModal = ({
             placeholder="예: 70 (지금 가지고 있는 주식 수)"
             placeholderTextColor={colors.textDim}
             keyboardType="decimal-pad"
+            {...numericAccessoryProps}
             style={styles.input}
           />
 
@@ -187,6 +196,7 @@ export const ItemEditorModal = ({
             placeholder={`남은 비중 ${remainingPercent.toFixed(2)}%`}
             placeholderTextColor={colors.textDim}
             keyboardType="decimal-pad"
+            {...numericAccessoryProps}
             style={styles.input}
           />
           <Text style={[styles.hint, isOver && { color: colors.danger }]}>
@@ -202,6 +212,16 @@ export const ItemEditorModal = ({
           </Pressable>
         </View>
       </View>
+
+      {Platform.OS === 'ios' ? (
+        <InputAccessoryView nativeID={NUMERIC_ACCESSORY_ID}>
+          <View style={styles.accessoryBar}>
+            <Pressable onPress={Keyboard.dismiss} hitSlop={8}>
+              <Text style={styles.accessoryDone}>완료</Text>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
+      ) : null}
 
       <StockSearchModal
         visible={searchOpen}
@@ -287,4 +307,13 @@ const styles = StyleSheet.create({
   },
   submitDisabled: { backgroundColor: colors.primaryDim },
   submitText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  accessoryBar: {
+    backgroundColor: colors.cardAlt,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    alignItems: 'flex-end',
+  },
+  accessoryDone: { color: colors.primary, fontSize: 16, fontWeight: '700' },
 });

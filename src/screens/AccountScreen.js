@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Alert,
+  InputAccessoryView,
+  Keyboard,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -28,6 +31,10 @@ import { BACKTEST_MODES, BacktestModal } from '@/components/BacktestModal';
 import { categoryColor, categoryLabel } from '@/constants/categories';
 import { fetchExchangeRate, fetchHistoricalCloses, fetchQuotes } from '@/services/stockApi';
 import { SCREENSHOT_ENABLED, screenshotEditorOpen } from '@/utils/screenshot';
+
+const NUMERIC_ACCESSORY_ID = 'accountNumericDone';
+const numericAccessoryProps =
+  Platform.OS === 'ios' ? { inputAccessoryViewID: NUMERIC_ACCESSORY_ID } : {};
 
 export const AccountScreen = () => {
   const {
@@ -241,6 +248,7 @@ export const AccountScreen = () => {
               placeholder="0"
               placeholderTextColor={colors.textDim}
               keyboardType="decimal-pad"
+              {...numericAccessoryProps}
             />
             <View style={styles.currencyToggle}>
               {['KRW', 'USD'].map((c) => (
@@ -534,6 +542,16 @@ export const AccountScreen = () => {
         error={backtestError}
         onRefresh={runBacktest}
       />
+
+      {Platform.OS === 'ios' ? (
+        <InputAccessoryView nativeID={NUMERIC_ACCESSORY_ID}>
+          <View style={styles.accessoryBar}>
+            <Pressable onPress={Keyboard.dismiss} hitSlop={8}>
+              <Text style={styles.accessoryDone}>완료</Text>
+            </Pressable>
+          </View>
+        </InputAccessoryView>
+      ) : null}
     </SafeAreaView>
   );
 };
@@ -541,6 +559,15 @@ export const AccountScreen = () => {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   scroll: { padding: spacing.lg, gap: spacing.md, paddingBottom: spacing.xl * 2 },
+  accessoryBar: {
+    backgroundColor: colors.cardAlt,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    alignItems: 'flex-end',
+  },
+  accessoryDone: { color: colors.primary, fontSize: 16, fontWeight: '700' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
   emptyTitle: { color: colors.text, fontSize: 18, fontWeight: '600', marginBottom: spacing.sm },
   emptyDesc: { color: colors.textDim, fontSize: 14, textAlign: 'center' },
