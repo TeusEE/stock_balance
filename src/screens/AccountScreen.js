@@ -540,6 +540,14 @@ export const AccountScreen = () => {
             addItem(activeAccount.id, payload);
           }
         }}
+        onDelete={
+          editingItem
+            ? () => {
+                removeItem(activeAccount.id, editingItem.id);
+                setEditingItem(undefined);
+              }
+            : undefined
+        }
       />
 
       <BacktestModal

@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
+  Alert,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -20,6 +21,7 @@ export const ItemEditorModal = ({
   remainingPercent,
   onClose,
   onSubmit,
+  onDelete,
 }) => {
   const [name, setName] = useState('');
   const [symbol, setSymbol] = useState(undefined);
@@ -76,6 +78,29 @@ export const ItemEditorModal = ({
     });
     onClose();
   };
+
+  const handleDelete = () => {
+    if (!onDelete) return;
+    Alert.alert(
+      '항목 삭제',
+      `“${initial?.name ?? ''}”을(를) 삭제할까요?\n이 작업은 되돌릴 수 없습니다.`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: () => {
+            onDelete();
+            onClose();
+          },
+        },
+      ],
+    );
+  };
+
+  // 편집 모드 = 기존 항목이 넘어왔을 때만(=initial 이 존재) 삭제 가능.
+  // 새 항목 추가 흐름에선 삭제 버튼을 숨긴다.
+  const isEditing = !!initial && !!onDelete;
 
   const pctNum = parseFloat(percent);
   const remainingAfter = remainingPercent - (isFinite(pctNum) ? pctNum : 0);
@@ -213,6 +238,12 @@ export const ItemEditorModal = ({
           >
             <Text style={styles.submitText}>저장</Text>
           </Pressable>
+
+          {isEditing && (
+            <Pressable style={styles.deleteBtn} onPress={handleDelete}>
+              <Text style={styles.deleteBtnText}>이 항목 삭제</Text>
+            </Pressable>
+          )}
           </Pressable>
         </Pressable>
       </KeyboardAvoidingView>
@@ -302,4 +333,13 @@ const styles = StyleSheet.create({
   },
   submitDisabled: { backgroundColor: colors.primaryDim },
   submitText: { color: '#fff', fontWeight: '700', fontSize: 16 },
+  deleteBtn: {
+    marginTop: spacing.md,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.danger,
+    alignItems: 'center',
+  },
+  deleteBtnText: { color: colors.danger, fontWeight: '600', fontSize: 15 },
 });
