@@ -1,6 +1,16 @@
 const SEARCH_URL = 'https://query2.finance.yahoo.com/v1/finance/search';
 const CHART_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
 
+// Yahoo Finance는 브라우저 같은 User-Agent 가 없는 요청을 429(Too Many Requests)로
+// 차단한다. 실측: UA 가 없으면 search/chart 모두 429, 브라우저 UA 를 붙이면 chart 가
+// 200 으로 응답함. 모든 호출에 공통 헤더를 적용한다.
+const REQUEST_HEADERS = {
+  Accept: 'application/json',
+  'Accept-Language': 'en-US,en;q=0.9',
+  'User-Agent':
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+};
+
 /**
  * Yahoo Finance로 주식/ETF를 검색합니다.
  * - 미국: AAPL, VOO 등
@@ -12,7 +22,7 @@ export async function searchStocks(query) {
 
   const url = `${SEARCH_URL}?q=${encodeURIComponent(trimmed)}&quotesCount=10&newsCount=0`;
   const res = await fetch(url, {
-    headers: { Accept: 'application/json' },
+    headers: REQUEST_HEADERS,
   });
   if (!res.ok) {
     throw new Error(`Search failed: ${res.status}`);
@@ -50,7 +60,7 @@ function parseChartMeta(data, requestedSymbol) {
 
 async function fetchChartQuote(symbol) {
   const url = `${CHART_URL}/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await fetch(url, { headers: REQUEST_HEADERS });
   if (!res.ok) {
     throw new Error(`Quote fetch failed: ${res.status}`);
   }
@@ -94,7 +104,7 @@ export async function fetchQuote(symbol) {
 export async function fetchExchangeRate(from = 'USD', to = 'KRW') {
   const symbol = `${from}${to}=X`;
   const url = `${CHART_URL}/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await fetch(url, { headers: REQUEST_HEADERS });
   if (!res.ok) return null;
   const data = await res.json();
   const price = data?.chart?.result?.[0]?.meta?.regularMarketPrice;
@@ -159,7 +169,7 @@ export async function fetchHistoricalClose(symbol, range = '6mo') {
   const url = `${CHART_URL}/${encodeURIComponent(symbol)}?interval=1d&range=${encodeURIComponent(
     range,
   )}`;
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  const res = await fetch(url, { headers: REQUEST_HEADERS });
   if (!res.ok) {
     throw new Error(`Historical fetch failed: ${res.status}`);
   }

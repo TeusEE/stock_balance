@@ -102,7 +102,7 @@ export const StockSearchModal = ({ visible, onClose, onSelect }) => {
               </Pressable>
             )}
             ListEmptyComponent={
-              !loading && query ? (
+              !loading && query && !error ? (
                 <Text style={styles.empty}>검색 결과가 없습니다.</Text>
               ) : null
             }
