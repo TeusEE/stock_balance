@@ -40,6 +40,11 @@
   - 통합(Consolidated) 화면은 이미 `holdings` 기준으로 무효화하고 있어 정상 동작 확인.
 
 ### 개선 (Changed)
+- **종목명을 한글로 표시** — 검색 결과를 선택할 때 Yahoo 의 영문 이름
+  (예: "Samsung Electronics")으로 덮어쓰던 것을, 네이버 검색의 **한글명**
+  (예: "삼성전자")을 유지하도록 변경. Yahoo 에서는 가격·통화만 가져온다.
+  (`StockSearchModal.handleSelect`) ※ 이미 저장된 기존 항목은 다시 검색·선택해야
+  한글명으로 갱신됨.
 - **오버레이 모달 배경 탭으로 닫기** — 화면 위로 떠오르는 바텀시트 모달의 어두운 배경을
   누르면 닫히도록 함(iOS 표준 동작). 적용: 백테스트 결과(`BacktestModal`),
   종목 검색(`StockSearchModal`), 항목 추가/편집(`ItemEditorModal`).

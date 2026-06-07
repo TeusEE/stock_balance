@@ -53,8 +53,10 @@ export const StockSearchModal = ({ visible, onClose, onSelect }) => {
 
   const handleSelect = async (quote) => {
     try {
+      // 이름은 검색 결과(네이버 한글명)를 유지하고, Yahoo 에서는 가격·통화만 가져온다.
+      // (Yahoo 의 shortName/longName 은 영문이라 그대로 쓰면 한글명이 사라진다.)
       const detail = await fetchQuote(quote.symbol);
-      onSelect(detail ?? quote);
+      onSelect({ ...quote, price: detail?.price, currency: detail?.currency });
     } catch {
       onSelect(quote);
     }
