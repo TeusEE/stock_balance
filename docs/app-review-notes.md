@@ -29,10 +29,10 @@ Stock Balance is a personal portfolio tracking and rebalancing calculator for re
 All data is stored on-device via standard AsyncStorage. No account, login, or demo credentials. First use: launch -> "+ 탭 추가" (add account) -> enter name and total -> "+ 항목 추가" (add item) -> "검색" (search by ticker/name; price and currency auto-fill) or type a name manually -> enter target % (donut updates live; warns if total is not 100%) -> see recommended shares -> "Consolidated" tab merges all accounts (symbol/group views).
 
 5) EXTERNAL SERVICES
-One external service, read-only and unauthenticated: Yahoo Finance public endpoints
-- https://query2.finance.yahoo.com/v1/finance/search
-- https://query1.finance.yahoo.com/v8/finance/chart/{symbol}
-Used to search securities, fetch current price/currency, and fetch historical daily closes for the backtest. No auth services, API keys, payment processors, AI/ML, analytics, ad SDKs, crash reporters, or own backend.
+Two external services, both read-only and unauthenticated:
+- Naver stock autocomplete (https://ac.stock.naver.com/ac) — used only to search securities by name/ticker (sends only the search text).
+- Yahoo Finance chart (https://query1.finance.yahoo.com/v8/finance/chart/{symbol}) — current price/currency and historical daily closes for the backtest (sends only the chosen ticker).
+No auth services, API keys, payment processors, AI/ML, analytics, ad SDKs, crash reporters, or own backend. No personal or device data is sent.
 
 6) REGIONAL CONSISTENCY
 Behavior is identical in all regions. The UI is Korean for this release, but all features work worldwide. Yahoo Finance covers global markets via ticker suffixes (e.g., "005930.KS" KOSPI, "AAPL" NASDAQ); nothing is region-locked and there are no country-specific gates.

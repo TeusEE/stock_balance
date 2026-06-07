@@ -4,6 +4,8 @@ import {
   fetchQuote,
   fetchQuotes,
   parseChartSeries,
+  searchStocks,
+  toYahooSymbol,
 } from '../stockApi';
 
 // 실제 삼성전자(005930.KS) v8 chart 응답을 본뜬 mock.
@@ -191,6 +193,92 @@ describe('parseChartSeries (백테스트용 과거 종가)', () => {
       'X',
     );
     expect(single).toBeNull();
+  });
+});
+
+// 네이버 자동완성 응답을 본뜬 mock
+function naverResponse(items) {
+  return { query: 'q', items };
+}
+
+describe('toYahooSymbol (네이버 코드 → Yahoo 심볼 매핑)', () => {
+  test('KOSPI 는 .KS 접미사를 붙인다', () => {
+    expect(toYahooSymbol({ code: '005930', typeCode: 'KOSPI', nationCode: 'KOR' })).toBe('005930.KS');
+  });
+  test('KOSDAQ 는 .KQ 접미사를 붙인다', () => {
+    expect(toYahooSymbol({ code: '247540', typeCode: 'KOSDAQ', nationCode: 'KOR' })).toBe('247540.KQ');
+  });
+  test('미국 종목은 티커 코드를 그대로 쓴다', () => {
+    expect(toYahooSymbol({ code: 'AAPL', typeCode: 'NASDAQ', nationCode: 'USA' })).toBe('AAPL');
+  });
+  test('한국의 Yahoo 미지원 시장(KONEX 등)은 null', () => {
+    expect(toYahooSymbol({ code: '900110', typeCode: 'KONEX', nationCode: 'KOR' })).toBeNull();
+  });
+  test('code 가 없으면 null', () => {
+    expect(toYahooSymbol({ typeCode: 'KOSPI', nationCode: 'KOR' })).toBeNull();
+  });
+});
+
+describe('searchStocks (네이버 자동완성)', () => {
+  test('한글명 검색 시 네이버 ac 엔드포인트를 인코딩된 q 로 호출한다', async () => {
+    global.fetch = jest.fn(() => okResponse(naverResponse([])));
+    await searchStocks('삼성전자');
+    const url = String(global.fetch.mock.calls[0][0]);
+    expect(url).toContain('ac.stock.naver.com/ac');
+    expect(url).toContain(`q=${encodeURIComponent('삼성전자')}`);
+    expect(url).not.toContain('finance.yahoo.com');
+  });
+
+  test('"삼성전자" → 005930.KS 로 매핑하고 한글명을 보존한다', async () => {
+    global.fetch = jest.fn(() =>
+      okResponse(
+        naverResponse([
+          { code: '005930', name: '삼성전자', typeCode: 'KOSPI', typeName: '코스피', nationCode: 'KOR' },
+        ]),
+      ),
+    );
+    const results = await searchStocks('삼성전자');
+    expect(results).toHaveLength(1);
+    expect(results[0].symbol).toBe('005930.KS');
+    expect(results[0].shortname).toBe('삼성전자');
+    expect(results[0].exchange).toBe('코스피');
+  });
+
+  test('KOSDAQ·미국 종목을 각각 .KQ / 접미사 없는 코드로 매핑한다', async () => {
+    global.fetch = jest.fn(() =>
+      okResponse(
+        naverResponse([
+          { code: '247540', name: '에코프로비엠', typeCode: 'KOSDAQ', nationCode: 'KOR' },
+          { code: 'AAPL', name: '애플', typeCode: 'NASDAQ', nationCode: 'USA' },
+        ]),
+      ),
+    );
+    const results = await searchStocks('에코');
+    expect(results.map((r) => r.symbol)).toEqual(['247540.KQ', 'AAPL']);
+  });
+
+  test('매핑 불가 항목은 결과에서 제외한다', async () => {
+    global.fetch = jest.fn(() =>
+      okResponse(
+        naverResponse([
+          { code: '005930', name: '삼성전자', typeCode: 'KOSPI', nationCode: 'KOR' },
+          { code: '900110', name: '이스트아시아홀딩스', typeCode: 'KONEX', nationCode: 'KOR' },
+        ]),
+      ),
+    );
+    const results = await searchStocks('홀딩스');
+    expect(results.map((r) => r.symbol)).toEqual(['005930.KS']);
+  });
+
+  test('빈 검색어는 네트워크 호출 없이 빈 배열', async () => {
+    global.fetch = jest.fn();
+    expect(await searchStocks('   ')).toEqual([]);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  test('네이버가 실패(503)하면 예외를 던진다', async () => {
+    global.fetch = jest.fn(() => errorResponse(503));
+    await expect(searchStocks('삼성')).rejects.toThrow();
   });
 });
 

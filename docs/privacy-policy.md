@@ -32,18 +32,19 @@ Uninstalling the app removes all stored data.
 
 ## External network requests
 
-The app makes anonymous, unauthenticated HTTPS requests to **Yahoo
-Finance's public chart endpoint** for the sole purpose of retrieving
-public market data:
+The app makes anonymous, unauthenticated HTTPS requests to two public
+endpoints for the sole purpose of retrieving public market data:
 
-- `https://query2.finance.yahoo.com/v1/finance/search` — stock/ETF search
+- `https://ac.stock.naver.com/ac` — searches for a stock/ETF by the
+  name or ticker you type (autocomplete). Only your search text is sent.
 - `https://query1.finance.yahoo.com/v8/finance/chart/{symbol}` — current
   price, currency, and historical daily close prices for the 6-month
-  backtest feature
+  backtest feature. Only the chosen ticker symbol is sent.
 
-These requests are issued **directly from your device** to Yahoo's
-servers. The app runs no backend of its own. The app does not send any
-of your portfolio data to Yahoo or to any other party.
+These requests are issued **directly from your device**. The app runs no
+backend of its own, and does not send any of your portfolio data, any
+personal information, or any device identifier to these services or to
+any other party.
 
 ## Children's privacy
 

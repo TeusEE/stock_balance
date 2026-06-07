@@ -1,9 +1,14 @@
-const SEARCH_URL = 'https://query2.finance.yahoo.com/v1/finance/search';
 const CHART_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
 
+// 종목 검색은 네이버 주식 자동완성을 사용한다.
+// Yahoo 검색 엔드포인트는 UA 없는 요청을 429로 차단하고 한글명 검색이 불안정하지만,
+// 네이버 자동완성은 한국주식(한글명)·미국주식(티커/한글명)·ETF를 한 번에 찾아주고
+// 종목코드를 돌려준다. 그 코드를 Yahoo 심볼로 매핑해 시세는 Yahoo chart 로 가져온다.
+const NAVER_SEARCH_URL = 'https://ac.stock.naver.com/ac';
+
 // Yahoo Finance는 브라우저 같은 User-Agent 가 없는 요청을 429(Too Many Requests)로
-// 차단한다. 실측: UA 가 없으면 search/chart 모두 429, 브라우저 UA 를 붙이면 chart 가
-// 200 으로 응답함. 모든 호출에 공통 헤더를 적용한다.
+// 차단한다. 실측: UA 가 없으면 chart 가 429, 브라우저 UA 를 붙이면 200 으로 응답함.
+// 모든 호출에 공통 헤더를 적용한다.
 const REQUEST_HEADERS = {
   Accept: 'application/json',
   'Accept-Language': 'en-US,en;q=0.9',
@@ -11,32 +16,64 @@ const REQUEST_HEADERS = {
     'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
 };
 
+// 네이버 자동완성용 헤더 (Referer 를 함께 보내 차단 가능성을 낮춘다)
+const NAVER_HEADERS = {
+  ...REQUEST_HEADERS,
+  Referer: 'https://m.stock.naver.com/',
+};
+
 /**
- * Yahoo Finance로 주식/ETF를 검색합니다.
- * - 미국: AAPL, VOO 등
- * - 한국: 005930.KS, 091160.KQ 등 (한글 종목명도 검색 가능)
+ * 네이버 자동완성 항목(code/typeCode/nationCode)을 Yahoo Finance 심볼로 변환한다.
+ * - 한국 KOSPI(한국 ETF 포함): `{code}.KS`
+ * - 한국 KOSDAQ:               `{code}.KQ`
+ * - 미국(NASDAQ/NYSE/AMEX):    `{code}` (접미사 없음)
+ * - 그 외: best-effort 로 `{code}` 그대로 (Yahoo 에서 해석 못 하면 시세 없음 처리)
+ * 매핑할 수 없으면 null.
+ */
+export function toYahooSymbol(item) {
+  if (!item || !item.code) return null;
+  const code = String(item.code).trim();
+  if (!code) return null;
+  const nation = item.nationCode;
+  const type = item.typeCode;
+  if (nation === 'KOR') {
+    if (type === 'KOSDAQ') return `${code}.KQ`;
+    if (type === 'KOSPI') return `${code}.KS`;
+    return null; // KONEX 등 Yahoo 미지원 시장은 제외
+  }
+  // 미국 및 그 외 해외: 티커 코드를 그대로 사용
+  return code;
+}
+
+/**
+ * 네이버 주식 자동완성으로 종목/ETF를 검색합니다.
+ * - 한국: "삼성전자", "에코프로비엠", "KODEX 200" 등 한글명·코드
+ * - 미국: "AAPL", "애플", "VOO" 등 티커·한글명
+ * 반환 형태는 기존과 동일: { symbol(=Yahoo 심볼), shortname, longname, exchange }
  */
 export async function searchStocks(query) {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
-  const url = `${SEARCH_URL}?q=${encodeURIComponent(trimmed)}&quotesCount=10&newsCount=0`;
-  const res = await fetch(url, {
-    headers: REQUEST_HEADERS,
-  });
+  const url = `${NAVER_SEARCH_URL}?q=${encodeURIComponent(trimmed)}&target=stock,etf`;
+  const res = await fetch(url, { headers: NAVER_HEADERS });
   if (!res.ok) {
     throw new Error(`Search failed: ${res.status}`);
   }
   const data = await res.json();
-  const quotes = data.quotes ?? [];
-  return quotes
-    .filter((q) => q.symbol && (q.quoteType === 'EQUITY' || q.quoteType === 'ETF'))
-    .map((q) => ({
-      symbol: q.symbol,
-      shortname: q.shortname ?? q.symbol,
-      longname: q.longname,
-      exchange: q.exchange,
-    }));
+  const items = Array.isArray(data?.items) ? data.items : [];
+  return items
+    .map((it) => {
+      const symbol = toYahooSymbol(it);
+      if (!symbol) return null;
+      return {
+        symbol,
+        shortname: it.name ?? symbol,
+        longname: it.name ?? undefined,
+        exchange: it.typeName ?? it.typeCode,
+      };
+    })
+    .filter(Boolean);
 }
 
 /**
