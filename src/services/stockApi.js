@@ -1,10 +1,12 @@
 const CHART_URL = 'https://query1.finance.yahoo.com/v8/finance/chart';
 
-// 종목 검색은 네이버 주식 자동완성을 사용한다.
-// Yahoo 검색 엔드포인트는 UA 없는 요청을 429로 차단하고 한글명 검색이 불안정하지만,
-// 네이버 자동완성은 한국주식(한글명)·미국주식(티커/한글명)·ETF를 한 번에 찾아주고
-// 종목코드를 돌려준다. 그 코드를 Yahoo 심볼로 매핑해 시세는 Yahoo chart 로 가져온다.
-const NAVER_SEARCH_URL = 'https://ac.stock.naver.com/ac';
+// 종목 검색은 네이버 주식 통합검색(front-api/search)을 사용한다.
+// Yahoo 검색은 UA 없는 요청을 429로 차단하고 한글명 검색이 불안정하다. 네이버
+// 자동완성(ac.stock.naver.com)은 이름 "앞부분"만 매칭해 ETF 를 키워드(예: "반도체",
+// "2차전지")로 못 찾는 한계가 있어, 부분/키워드 매칭이 되는 통합검색 엔드포인트를 쓴다.
+// 한국주식(한글명)·미국주식(티커/한글명)·ETF를 모두 찾아 종목코드를 돌려주며,
+// 그 코드를 Yahoo 심볼로 매핑해 시세는 Yahoo chart 로 가져온다.
+const NAVER_SEARCH_URL = 'https://m.stock.naver.com/front-api/search';
 
 // Yahoo Finance는 브라우저 같은 User-Agent 가 없는 요청을 429(Too Many Requests)로
 // 차단한다. 실측: UA 가 없으면 chart 가 429, 브라우저 UA 를 붙이면 200 으로 응답함.
@@ -46,8 +48,8 @@ export function toYahooSymbol(item) {
 }
 
 /**
- * 네이버 주식 자동완성으로 종목/ETF를 검색합니다.
- * - 한국: "삼성전자", "에코프로비엠", "KODEX 200" 등 한글명·코드
+ * 네이버 주식 통합검색으로 종목/ETF를 검색합니다. (부분·키워드 매칭)
+ * - 한국: "삼성전자", "에코프로", "반도체", "2차전지", "KODEX 200" 등 한글명·키워드·코드
  * - 미국: "AAPL", "애플", "VOO" 등 티커·한글명
  * 반환 형태는 기존과 동일: { symbol(=Yahoo 심볼), shortname, longname, exchange }
  */
@@ -55,13 +57,18 @@ export async function searchStocks(query) {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
-  const url = `${NAVER_SEARCH_URL}?q=${encodeURIComponent(trimmed)}&target=stock,etf`;
+  const url = `${NAVER_SEARCH_URL}?q=${encodeURIComponent(trimmed)}&target=stock,etf&size=10&page=1`;
   const res = await fetch(url, { headers: NAVER_HEADERS });
   if (!res.ok) {
     throw new Error(`Search failed: ${res.status}`);
   }
   const data = await res.json();
-  const items = Array.isArray(data?.items) ? data.items : [];
+  // 통합검색은 result.items 에, 자동완성은 최상위 items 에 담는다. 둘 다 허용.
+  const items = Array.isArray(data?.result?.items)
+    ? data.result.items
+    : Array.isArray(data?.items)
+      ? data.items
+      : [];
   return items
     .map((it) => {
       const symbol = toYahooSymbol(it);

@@ -30,7 +30,7 @@ All data is stored on-device via standard AsyncStorage. No account, login, or de
 
 5) EXTERNAL SERVICES
 Two external services, both read-only and unauthenticated:
-- Naver stock autocomplete (https://ac.stock.naver.com/ac) — used only to search securities by name/ticker (sends only the search text).
+- Naver stock search (https://m.stock.naver.com/front-api/search) — used only to search securities by name/ticker (sends only the search text).
 - Yahoo Finance chart (https://query1.finance.yahoo.com/v8/finance/chart/{symbol}) — current price/currency and historical daily closes for the backtest (sends only the chosen ticker).
 No auth services, API keys, payment processors, AI/ML, analytics, ad SDKs, crash reporters, or own backend. No personal or device data is sent.
 

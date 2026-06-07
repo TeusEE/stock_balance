@@ -35,8 +35,8 @@ Uninstalling the app removes all stored data.
 The app makes anonymous, unauthenticated HTTPS requests to two public
 endpoints for the sole purpose of retrieving public market data:
 
-- `https://ac.stock.naver.com/ac` — searches for a stock/ETF by the
-  name or ticker you type (autocomplete). Only your search text is sent.
+- `https://m.stock.naver.com/front-api/search` — searches for a stock/ETF
+  by the name or ticker you type. Only your search text is sent.
 - `https://query1.finance.yahoo.com/v8/finance/chart/{symbol}` — current
   price, currency, and historical daily close prices for the 6-month
   backtest feature. Only the chosen ticker symbol is sent.

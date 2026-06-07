@@ -18,12 +18,16 @@
 **Yahoo 심볼(.KS/.KQ)** 로 매핑해 **시세·과거시세는 기존 Yahoo(UA 적용됨)** 로 가져온다.
 → 검색=네이버, 시세=Yahoo 하이브리드.
 
-### 검증된 네이버 엔드포인트 (실측 2026-06-06)
+### 검증된 네이버 엔드포인트 (실측 2026-06-06 / 06-07 갱신)
+> 자동완성(`ac.stock.naver.com/ac`)은 이름 **앞부분(prefix)** 만 매칭해 ETF를
+> 키워드("반도체", "2차전지")로 못 찾는 한계가 있었다. **통합검색(front-api/search)**
+> 으로 교체 — 부분·키워드 매칭 지원, 항목 구조는 동일.
 ```
-GET https://ac.stock.naver.com/ac?q=<검색어>&target=stock,etf
+GET https://m.stock.naver.com/front-api/search?q=<검색어>&target=stock,etf&size=10&page=1
 헤더: User-Agent(브라우저) + Accept: application/json + Referer: https://m.stock.naver.com/
 ```
-응답 `data.items[]` = `{ code, name, typeCode, typeName, nationCode, category }`
+응답 `result.items[]` = `{ code, name, typeCode, typeName, nationCode, category }`
+(부분/키워드 매칭 실측: "반도체"→KODEX 반도체·TIGER 반도체TOP10, "2차전지", "미국S&P500" 등)
 
 | 검색어 | 결과 |
 |---|---|

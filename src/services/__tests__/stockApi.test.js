@@ -196,9 +196,9 @@ describe('parseChartSeries (백테스트용 과거 종가)', () => {
   });
 });
 
-// 네이버 자동완성 응답을 본뜬 mock
+// 네이버 통합검색(front-api/search) 응답을 본뜬 mock — items 는 result 안에 담긴다.
 function naverResponse(items) {
-  return { query: 'q', items };
+  return { isSuccess: true, result: { query: 'q', totalCount: items.length, items } };
 }
 
 describe('toYahooSymbol (네이버 코드 → Yahoo 심볼 매핑)', () => {
@@ -219,14 +219,27 @@ describe('toYahooSymbol (네이버 코드 → Yahoo 심볼 매핑)', () => {
   });
 });
 
-describe('searchStocks (네이버 자동완성)', () => {
-  test('한글명 검색 시 네이버 ac 엔드포인트를 인코딩된 q 로 호출한다', async () => {
+describe('searchStocks (네이버 통합검색)', () => {
+  test('한글명 검색 시 네이버 통합검색 엔드포인트를 인코딩된 q 로 호출한다', async () => {
     global.fetch = jest.fn(() => okResponse(naverResponse([])));
     await searchStocks('삼성전자');
     const url = String(global.fetch.mock.calls[0][0]);
-    expect(url).toContain('ac.stock.naver.com/ac');
+    expect(url).toContain('m.stock.naver.com/front-api/search');
     expect(url).toContain(`q=${encodeURIComponent('삼성전자')}`);
     expect(url).not.toContain('finance.yahoo.com');
+  });
+
+  test('ETF 키워드(부분명)로도 결과를 매핑한다', async () => {
+    global.fetch = jest.fn(() =>
+      okResponse(
+        naverResponse([
+          { code: '091160', name: 'KODEX 반도체', typeCode: 'KOSPI', nationCode: 'KOR' },
+          { code: '396500', name: 'TIGER 반도체TOP10', typeCode: 'KOSPI', nationCode: 'KOR' },
+        ]),
+      ),
+    );
+    const results = await searchStocks('반도체');
+    expect(results.map((r) => r.symbol)).toEqual(['091160.KS', '396500.KS']);
   });
 
   test('"삼성전자" → 005930.KS 로 매핑하고 한글명을 보존한다', async () => {
