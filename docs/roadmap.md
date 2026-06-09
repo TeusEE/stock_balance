@@ -142,6 +142,10 @@ fx_return       = (endFXRate − startFXRate) / startFXRate       # 종목통화
 
 ## 🟣 v3 — 포트폴리오 공유 대시보드 + 순위판 (Supabase)
 
+> 📘 **상세 실행 계획: [`v3-implementation-plan.md`](v3-implementation-plan.md)** —
+> 정확한 RLS 정책 SQL, RN Supabase 세션 설정, App Store UGC(1.2) 신고/차단,
+> App Privacy 설문 전환, 익명계정 한계 등 구현·심사 디테일을 보강한 문서.
+
 ### 목표
 유저가 자신의 포트폴리오를 **남들과 공유**할 수 있는 공유 대시보드를 제공하고,
 v2에서 계산한 **6개월 백테스트 수익률을 기준으로 순위를 매겨** 우수 포트폴리오를 자랑할 수 있는
