@@ -169,7 +169,9 @@ N일마다:  total = Σ value_i; value_i = total × 정규화비중_i   # 목표
 
 ---
 
-## v2.2 — 환차익(FX) 포함 백테스트
+## v2.2 — 환차익(FX) 포함 백테스트 — ⛔ 취소됨 (2026-06-09)
+
+> **이 기능은 구현하지 않기로 결정했다.** 아래 설계는 참고용으로만 남겨둔다.
 
 > **백엔드 변화 0, 새 함수 0.** 기존 `fetchHistoricalClose` 가 FX 심볼(`USDKRW=X`, `KRWUSD=X`)도
 > 그대로 받기 때문에 v2.2 는 기본적으로 `computeBacktest` 한 함수의 옵션 확장 + 두 화면의
@@ -399,12 +401,12 @@ create table shared_portfolios (
 7. `backtest.js`에 `alignSeries` + `simulate(weighted, seriesMap, {intervalDays})` 추가 (+ 테스트).
 8. `BacktestModal`에 보유/매주/매월/매분기 세그먼트 + "보유 대비 ±%p" 표시.
 
-**v2.2 (v2.1 완료 후) — 환차익 포함**
-9. `backtest.js`에 `uniqueFXPairsForBacktest` + `buildFXMap` + `computeBacktest` 옵션
-   (`baseCurrency`, `fxMap`) 확장 (+ 테스트 — 회귀 0, USD/KRW 결합 케이스, no-fx-data 제외).
-10. `AccountScreen.runBacktest` — base=`account.currency`, FX pair 같이 fetch, 옵션 전달.
-11. `ConsolidatedScreen.runBacktest` — base=헤더 토글값, base 변경 시 캐시 무효화 추가.
-12. `BacktestModal` 라벨에 base 통화 표시, `no-fx-data` reason 라벨 추가.
+**v2.2 (환차익 포함) — ⛔ 취소됨 (2026-06-09), 구현하지 않음**
+9. ~~`backtest.js`에 `uniqueFXPairsForBacktest` + `buildFXMap` + `computeBacktest` 옵션
+   (`baseCurrency`, `fxMap`) 확장.~~
+10. ~~`AccountScreen.runBacktest` — base=`account.currency`, FX pair 같이 fetch, 옵션 전달.~~
+11. ~~`ConsolidatedScreen.runBacktest` — base=헤더 토글값, base 변경 시 캐시 무효화 추가.~~
+12. ~~`BacktestModal` 라벨에 base 통화 표시, `no-fx-data` reason 라벨 추가.~~
 
 **v3 (이후, Supabase 도입)**
 13. 공통 선결: Supabase 프로젝트 + 의존성 + `supabase.js` + 익명 로그인 + 개인정보 설문 갱신.
