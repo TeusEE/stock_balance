@@ -1,9 +1,15 @@
 # v3 상세 구현 계획 (리비전) — 공유 대시보드 + 순위판 (Supabase)
 
-> 상태: **설계 / 구현 대기**
-> 작성: 2026-06-09 · **리비전: 2026-06-18**
+> 상태: **v3.0 구현 중** — 데이터 레이어 + 공유/뷰어 UI 완료(라이브 검증 통과). 남은 것: UGC 신고 보강·모더레이션·심사 문서·실기기 테스트.
+> 작성: 2026-06-09 · **리비전: 2026-06-18** · **진행 갱신: 2026-06-18**
 > 상위 문서: [`roadmap.md`](roadmap.md) · 출시 현황: [`../progress.md`](../progress.md)
 > 선행 조건: **1.1.0 App Store 배포 완료**(v2.0/v2.1 백테스트 포함). v3는 별도 버전으로 진행.
+>
+> **v3.0 진행 현황 요약**
+> - ✅ Supabase 프로젝트 + §4 스키마/RLS/RPC 적용(`pgcrypto` search_path 패치 포함), 라이브 스모크 9개 통과
+> - ✅ 데이터 레이어: `supabase.js` / `shareApi.js` / `AuthContext`(별명+비번) / `shareSerialize` / `nickname` (+테스트, 전체 65개 통과)
+> - ✅ UI: `ShareModal` / `SharedViewer` / `ViewSharedModal`(신고·차단) + 통합 화면 연결, `App.js` AuthProvider
+> - ⬜ UGC 신고를 비등록 열람자에게도 허용 · 모더레이션(is_hidden) · 비속어 필터 · 처리방침/App Privacy 갱신 · 레이트리밋 · 실기기 테스트
 
 이 문서는 기존 v3 계획을 **방향은 유지(공유 + 순위판)하되 약점을 보완**해 다시 쓴 실행용 계획이다.
 이전 버전(`v2-v3-implementation-plan.md`의 v3 섹션)은 폐기되었다.
@@ -32,8 +38,8 @@
 ## 1. 범위 & 2단계 출시
 
 ### v3.0 — 공유 + 읽기전용 뷰어 (첫 서버 전송 릴리스, 예: 1.2.0)
-**포함**: 이메일 OTP 인증 + 닉네임 / 포트폴리오 공유(비중만, `private`·`unlisted`(링크) ) /
-링크로 받은 공유물 **읽기전용 뷰어** / 신고·차단·EULA(1.2 기본 대응) / 처리방침·App Privacy 갱신.
+**포함**: 별명+비밀번호 인증(Auth 미사용) / 포트폴리오 공유(비중만, `private`·`unlisted`(링크) ) /
+링크(공유 코드)로 받은 공유물 **읽기전용 뷰어** / 신고·차단·EULA(1.2 기본 대응) / 처리방침·App Privacy 갱신.
 **핵심**: 공개 "탐색 피드"와 순위판은 **아직 없음** → 무한 노출되는 UGC 표면이 작아 첫 심사 리스크 최소화.
 
 ### v3.1 — 공개 피드 + 순위판 (예: 1.3.0)
@@ -52,16 +58,16 @@
 ## 2. 선결 작업 (구현 진입 전 1회)
 
 ### Supabase (계정 보유자 직접)
-- [ ] 프로젝트 생성 → **Project URL**, **anon public key** 확보 (Settings → API)
-- [ ] **Supabase Auth 사용 안 함** — Provider 설정 불필요. 별명+비밀번호는 앱 테이블(`app_users`)로 자체 관리(§3,§4)
-- [ ] 둘러보기는 로그인 불필요(anon 키 + RLS 공개 읽기)
-- [ ] SQL Editor에서 §4 스키마 + `pgcrypto` 확장 + RLS + RPC 실행
-- [ ] (보안) RPC 호출 레이트리밋으로 비밀번호 무차별 추측 방지
+- [x] 프로젝트 생성 → **Project URL**, **anon public key** 확보 (Settings → API) — `app.json` extra 에 연결됨
+- [x] **Supabase Auth 사용 안 함** — Provider 설정 불필요. 별명+비밀번호는 앱 테이블(`app_users`)로 자체 관리(§3,§4)
+- [x] 둘러보기는 로그인 불필요(anon 키 + RLS 공개 읽기) — 설계로 충족
+- [x] SQL Editor에서 §4 스키마 + `pgcrypto` 확장 + RLS + RPC 실행 — 완료(+`auth_nickname` search_path=`public, extensions` 패치)
+- [ ] (보안) RPC 호출 레이트리밋으로 비밀번호 무차별 추측 방지 — **미완**
 - [ ] (v3.1) Edge Functions 활성화 — 순위판 재계산 함수 배포(§6)
-- [ ] Auth → Rate limits 확인 (가입/OTP 남용 방지)
+- [ ] Auth → Rate limits 확인 (가입 남용 방지) — **미완**
 
 ### 클라이언트 의존성
-- [ ] `@supabase/supabase-js`, `react-native-url-polyfill`, `@react-native-async-storage/async-storage`(이미 있음)
+- [x] `@supabase/supabase-js`, `react-native-url-polyfill`, `expo-constants`(신규 설치), `@react-native-async-storage/async-storage`(기존)
 
 ### 키 관리
 - anon 키는 공개돼도 **RLS로 보호** → `app.json`의 `expo.extra.supabaseUrl/supabaseAnonKey`.
@@ -82,25 +88,19 @@
 - **등록 순서**: ① 별명(랜덤 추천 or 직접 입력 + 중복 확인) → ② 비밀번호 → 끝.
 - 같은 별명+비밀번호로 **어느 기기에서나 로그인** → 재설치·기기 변경에도 내 공유물/순위 유지.
 
-### Supabase 클라이언트 (`src/services/supabase.js`)
-RN 전용 설정이 핵심 — 빠지면 세션이 유지되지 않는다.
+### Supabase 클라이언트 (`src/services/supabase.js`) — 구현됨 ✅
+GoTrue 세션을 쓰지 않으므로 세션 옵션을 모두 끈다(anon 키로 RPC/SELECT 호출만).
 ```js
 import 'react-native-url-polyfill/auto';            // 최상단, fetch/URL 폴리필
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 import Constants from 'expo-constants';
 
-const { supabaseUrl, supabaseAnonKey } = Constants.expoConfig.extra;
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    storage: AsyncStorage,
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: false,   // RN 필수
-  },
+const extra = Constants.expoConfig?.extra ?? {};
+export const supabase = createClient(extra.supabaseUrl ?? '', extra.supabaseAnonKey ?? '', {
+  auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
 });
+export const isSupabaseConfigured = Boolean(extra.supabaseUrl && extra.supabaseAnonKey);
 ```
-- GoTrue 세션을 쓰지 않으므로 위 `auth` 옵션은 사실상 무관 — 클라이언트는 **anon 키로 RPC/SELECT 호출**에만 사용.
 
 ### Supabase Auth 미사용 — 별명·비밀번호를 우리 테이블에 직접 저장
 GoTrue(Supabase Auth)를 쓰지 않는다. 별명·비밀번호는 **우리 DB(`app_users`)에 저장되는 데이터**이고,
@@ -289,11 +289,11 @@ export function toSharePayload({ title, baseCurrency, holdings }) {
 
 ### 7-1. UGC — Guideline 1.2
 닉네임·공유 포트폴리오·(v3.1)순위판은 사용자 생성 콘텐츠다.
-- [ ] **EULA 동의** — 최초 공유 전 "불쾌한 콘텐츠 무관용" 약관 동의(NicknameModal 내 체크).
-- [ ] **신고(report)** — 모든 공유/순위 항목에 "신고" 버튼(`reports` INSERT).
-- [ ] **차단(block)** — 특정 사용자 콘텐츠 숨기기(`blocks`).
-- [ ] **모더레이션** — 신고 콘텐츠 **24시간 내 조치**(MVP: 신고 임계치 → `is_hidden`, 운영자 수동 검토). 연락처 `xodn1311@gmail.com`.
-- [ ] **콘텐츠 필터** — 닉네임/제목 비속어 1차 필터(금지어 목록).
+- [x] **EULA 동의** — 최초 공유 전 "불쾌한 콘텐츠 무관용" 약관 동의(`ShareModal` 내 체크박스, 미동의 시 공유 불가).
+- [~] **신고(report)** — `ViewSharedModal`에 신고 버튼 + `report_portfolio` RPC. ⚠️ **현재 별명 등록자만 가능** → 비등록 열람자도 가능하게 보강 필요.
+- [~] **차단(block)** — `ViewSharedModal`에 작성자 차단 + `block_user` RPC. (신고와 동일하게 등록자 한정)
+- [ ] **모더레이션** — 신고 콘텐츠 **24시간 내 조치**(MVP: 신고 임계치 → `is_hidden`, 운영자 수동 검토). 연락처 `xodn1311@gmail.com`. **미완**
+- [ ] **콘텐츠 필터** — 닉네임/제목 비속어 1차 필터(금지어 목록). **미완**
 
 > 2단계 출시 덕분에 v3.0은 공개 피드/순위판이 없어 노출 표면이 작다. 단, **링크 공유물도 UGC**이므로
 > 신고/차단/EULA는 v3.0부터 갖춘다.
@@ -315,30 +315,34 @@ v3부터 수집 신고:
 ---
 
 ## 8. 보안 / 무결성
-- **RLS 검증**: 타 user row의 UPDATE/DELETE/INSERT(owner 위조) 거부, `return_6m`/`on_leaderboard` 클라 변경 거부(트리거).
-- **순위 무결성**: 수익률은 Edge Function(service_role)만 기록(§6). 클라이언트 제출값 신뢰 안 함.
+- **RLS 검증** ✅(스모크): anon 의 `app_users` 직접 접근 차단, 공개 글만 SELECT. 쓰기는 별명+비번 검증 RPC로만.
+- **순위 무결성**: 수익률은 Edge Function(service_role)만 기록(§6). 클라 입력 RPC에 `return_6m`/`on_leaderboard` 칸 없음 → 위조 불가.
 - **링크 공유 비밀성**: `unlisted`는 토큰 RPC로만 단건 조회, 공개 목록 쿼리엔 안 잡힘.
-- **남용 방지**: OTP/가입 rate limit, 자랑하기 호출 빈도 제한.
+- **남용 방지**: 가입/RPC rate limit(**미설정 — 선결 작업 §2**), (v3.1) 자랑하기 호출 빈도 제한.
 - **service_role 키**: Edge Function 환경변수에만. 클라이언트 유입 금지(코드리뷰 체크).
 
 ---
 
 ## 9. 신규 코드 / 재사용 / 네비게이션
 
-### 신규 파일
-| 파일 | 단계 | 역할 |
-|---|---|---|
-| `src/services/supabase.js` | v3.0 | anon 클라이언트 싱글톤(§3) — RPC/SELECT용, GoTrue 세션 미사용 |
-| `src/services/shareApi.js` | v3.0 | RPC 래퍼(별명+비번 동봉): `publishPortfolio`/`updateShared`/`unpublish`/`getByToken`/`report`/`block` (+v3.1 `submitToLeaderboard`/`listPublic`/`listLeaderboard`) |
-| `src/utils/shareSerialize.js` | v3.0 | 비중만 추출(§5) |
-| `src/context/AuthContext.js` | v3.0 | 별명+비밀번호 등록/검증(RPC), 자격 보관 |
-| `src/utils/nickname.js` | v3.0 | 랜덤 별명 추천 + 별명 정규화(§3) |
-| `src/components/NicknameModal.js` | v3.0 | 별명(랜덤/직접)+비밀번호 등록 + EULA 동의 |
-| `src/components/SharedViewer.js` | v3.0 | 읽기전용 뷰어(도넛+리스트). `ConsolidatedScreen` 렌더 추출 |
-| `src/screens/SharedDetailScreen.js` | v3.0 | 링크/토큰으로 받은 공유물 상세(뷰어 + 신고/차단) |
-| `src/screens/ShareDashboardScreen.js` | v3.1 | 공개 피드 탐색 |
-| `src/screens/LeaderboardScreen.js` | v3.1 | 수익률 내림차순 순위판 |
-| `supabase/functions/recompute-return/` | v3.1 | 순위판 수익률 서버 재계산(§6) |
+### 신규 파일 (상태)
+| 파일 | 단계 | 상태 | 역할 |
+|---|---|---|---|
+| `src/services/supabase.js` | v3.0 | ✅ | anon 클라이언트 싱글톤(§3) — RPC/SELECT용, GoTrue 세션 미사용 |
+| `src/services/shareApi.js` | v3.0 | ✅ | RPC 래퍼(별명+비번 동봉): `publishPortfolio`/`updatePortfolio`/`unpublishPortfolio`/`getSharedByToken`/`reportPortfolio`/`blockUser` |
+| `src/utils/shareSerialize.js` | v3.0 | ✅ | 비중만 추출(§5) + 테스트 |
+| `src/context/AuthContext.js` | v3.0 | ✅ | 별명+비밀번호 등록/검증(`auth_nickname` RPC), 자격 메모리 보관, `checkNicknameAvailable` |
+| `src/utils/nickname.js` | v3.0 | ✅ | 랜덤 별명 추천 + 정규화 + 검증(§3) + 테스트 |
+| `src/components/ShareModal.js` | v3.0 | ✅ | 별명(랜덤/직접)+비밀번호+EULA → 게시 → 공유 코드(구 `NicknameModal` 흡수) |
+| `src/components/SharedViewer.js` | v3.0 | ✅ | 읽기전용 뷰어(도넛+리스트, 비중만) |
+| `src/components/ViewSharedModal.js` | v3.0 | ✅ | 공유 코드로 열람 + 신고/차단(구 `SharedDetailScreen` 대체, 모달 방식) |
+| `scripts/check-supabase.js` | v3.0 | ✅ | 라이브 스모크(등록/게시/토큰조회/비번오류/RLS/정리) |
+| `src/screens/ShareDashboardScreen.js` | v3.1 | ⬜ | 공개 피드 탐색 |
+| `src/screens/LeaderboardScreen.js` | v3.1 | ⬜ | 수익률 내림차순 순위판 |
+| `supabase/functions/recompute-return/` | v3.1 | ⬜ | 순위판 수익률 서버 재계산(§6) |
+
+> 메모: v3.0 은 공유 진입을 별도 탭/스택 대신 **통합 화면의 버튼 + 모달**(`ShareModal`/`ViewSharedModal`)로 구현했다.
+> 전용 탭/스택(`ShareDashboard → SharedDetail → Leaderboard`)은 v3.1 공개 피드와 함께 도입.
 
 ### 재사용
 - `src/utils/aggregate.js`(`aggregateAcrossAccounts`/`aggregateByCategory`) — 뷰어 비중 분포.
@@ -355,24 +359,24 @@ v3부터 수집 신고:
 ---
 
 ## 10. 테스트 / 검증
-- `npm test`: `shareSerialize`가 금액/수량/현재가를 **절대 포함하지 않음**(핵심), `shareApi` 페이로드 형태(supabase mock).
-- RLS(SQL 에디터): 타인 row 변조 거부, `return_6m`/`on_leaderboard` 클라 변경 거부, `private`/`is_hidden`가 목록에서 빠짐.
-- 링크 공유: `get_shared_by_token` 정상 단건 조회, 토큰 없이는 비노출.
-- (v3.1) Edge Function: 위조한 `return_6m` 제출해도 서버 재계산값으로 덮어쓰는지.
-- `auth_nickname` RPC: 신규 별명=등록, 기존 별명+올바른 비번=통과, 틀린 비번=거부. 비번 해시가 클라로 안 나가는지.
-- 실기기: 별명+비밀번호 등록 → 공유 → 다른 기기에서 같은 별명+비밀번호 로그인 시 내 공유물 보임(영속성 확인).
-- 둘러보기: 로그인 없이 공개 피드/순위판 조회되는지(anon 키 + RLS 공개 읽기).
+- [x] `npm test`: `shareSerialize`가 금액/수량/현재가를 **절대 포함하지 않음**(핵심), `shareApi` 페이로드 형태(supabase mock). + `nickname`. **전체 65개 통과.**
+- [x] 라이브 스모크(`node scripts/check-supabase.js`): `auth_nickname`(등록/검증/틀린비번 거부), `publish`/`get_shared_by_token`, `public_profiles`(해시 미노출), **`app_users` 직접 SELECT 차단(RLS)**, 정리 — 9개 통과.
+- [x] `return_6m`/`on_leaderboard` 위조 방지: 클라 입력 RPC에 해당 컬럼 없음 + anon 직접 UPDATE는 RLS 차단(트리거 불필요).
+- [ ] (v3.1) Edge Function: 위조한 `return_6m` 제출해도 서버 재계산값으로 덮어쓰는지.
+- [ ] 실기기: 별명+비밀번호 등록 → 공유 → 다른 기기에서 같은 별명+비밀번호로 내 공유물 관리(영속성).
+- [ ] 둘러보기/공개 피드(v3.1): 로그인 없이 조회(anon 키 + RLS 공개 읽기).
 
 ---
 
 ## 11. 구현 순서 (권장)
 
 **v3.0 (공유 + 뷰어 · 첫 서버 릴리스, 1.2.0)**
-1. deps + `supabase.js`(§3) + `nickname.js` + `AuthContext`(별명+비밀번호 RPC) + §4 스키마/RPC(pgcrypto) + `app.json extra`.
-2. `shareSerialize`(+테스트) + `shareApi`(publish/update/unpublish/getByToken) + `NicknameModal`(별명+비밀번호+EULA).
-3. `SharedViewer`(ConsolidatedScreen 렌더 추출) + `SharedDetailScreen` + "공유하기" 버튼.
-4. UGC 기본: 신고/차단/`is_hidden`/비속어 필터(§7-1).
-5. 심사 문서: 처리방침·App Privacy·Notes 갱신(§7) → 1.2.0 빌드·제출(1.1.0 통과 후).
+1. [x] deps + `supabase.js`(§3) + `nickname.js` + `AuthContext`(별명+비밀번호 RPC) + §4 스키마/RPC(pgcrypto) + `app.json extra`.
+2. [x] `shareSerialize`(+테스트) + `shareApi`(publish/update/unpublish/getByToken) + `ShareModal`(별명+비밀번호+EULA).
+3. [x] `SharedViewer` + `ViewSharedModal`(공유 코드로 열람) + 통합 화면 "공유" 버튼.
+4. [~] UGC 기본: 신고/차단 ✅(등록자 한정) · `is_hidden`/비속어 필터 ⬜ · **비등록 열람자 신고 허용 보강 필요**(§7-1).
+5. [ ] 심사 문서: 처리방침·App Privacy·Notes 갱신(§7) → 1.2.0 빌드·제출(1.1.0 통과 후).
+6. [ ] 실기기 테스트: 공유 → 코드 → 다른 기기 열람, 신고/차단 동작 확인(§10).
 
 **v3.1 (공개 피드 + 순위판, 1.3.0)**
 6. `visibility='public'` 허용 + `ShareDashboardScreen`(공개 피드).
