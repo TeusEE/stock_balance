@@ -66,6 +66,25 @@ function ok(label, cond, extra) {
   const rep = await supabase.rpc('report_shared', { p_id: row?.id, p_reason: '스모크 테스트' });
   ok('report_shared (익명 신고)', !rep.error, rep.error ? `${rep.error.message} — report_shared 미배포면 마이그레이션 실행 필요` : '');
 
+  // 6.7) v3.1 공개 등재 + 수익률 제출 → 둘러보기 노출/검색
+  const sub = await supabase.rpc('submit_return', { p_nickname: NICK, p_password: PW, p_id: row?.id, p_return: 12.34 });
+  ok('submit_return (공개 등재)', !sub.error, sub.error ? `${sub.error.message} — v3.1 마이그레이션 실행 필요` : '');
+
+  const top = await supabase.rpc('browse_public', { p_sort: 'return', p_nickname: null, p_symbol: null, p_limit: 5, p_offset: 0 });
+  const found = Array.isArray(top.data) ? top.data.find((r) => r.id === row?.id) : null;
+  ok('browse_public Top5 에 공개글 노출', !top.error && !!found, top.error ? `${top.error.message} — v3.1 마이그레이션 실행 필요` : '');
+  ok('browse_public share_token 미반환', found ? !('share_token' in found) : false);
+  ok('browse_public return_6m 반영', found ? Number(found.return_6m) === 12.34 : false);
+
+  const byNick = await supabase.rpc('browse_public', { p_sort: 'return', p_nickname: NICK, p_symbol: null, p_limit: 10, p_offset: 0 });
+  ok('browse_public 별명 검색', !byNick.error && (byNick.data ?? []).some((r) => r.id === row?.id), byNick.error?.message);
+
+  const bySymbol = await supabase.rpc('browse_public', { p_sort: 'return', p_nickname: null, p_symbol: 'AAPL', p_limit: 10, p_offset: 0 });
+  ok('browse_public 종목 검색(AAPL)', !bySymbol.error && (bySymbol.data ?? []).some((r) => r.id === row?.id), bySymbol.error?.message);
+
+  const byName = await supabase.rpc('browse_public', { p_sort: 'return', p_nickname: null, p_symbol: '삼성', p_limit: 10, p_offset: 0 });
+  ok('browse_public 종목명 검색(삼성)', !byName.error && (byName.data ?? []).some((r) => r.id === row?.id), byName.error?.message);
+
   // 7) 정리: 게시물 삭제(테스트 유저는 남음, 신고는 cascade 삭제)
   const del = await supabase.rpc('unpublish_portfolio', { p_nickname: NICK, p_password: PW, p_id: row?.id });
   ok('unpublish_portfolio (정리)', !del.error, del.error?.message);

@@ -81,3 +81,37 @@ export async function blockUser({ nickname, password, blocked }) {
     await supabase.rpc('block_user', { p_nickname: nickname, p_password: password, p_blocked: blocked }),
   );
 }
+
+/**
+ * 공개 포트폴리오 둘러보기 (v3.1) — 순위/별명검색/종목검색/페이지네이션.
+ * @param sort 'return'(수익률순) | 'recent'(최신순)
+ * @param nickname 작성자 별명 부분검색(옵션)
+ * @param symbol 보유 종목 티커/종목명 부분검색(옵션)
+ * @returns 공개 포트폴리오 row 배열(닉네임 포함, share_token 제외)
+ */
+export async function browsePublic({ sort = 'return', nickname = null, symbol = null, limit = 5, offset = 0 } = {}) {
+  return unwrap(
+    await supabase.rpc('browse_public', {
+      p_sort: sort,
+      p_nickname: nickname || null,
+      p_symbol: symbol || null,
+      p_limit: limit,
+      p_offset: offset,
+    }),
+  );
+}
+
+/**
+ * 공개 등재 + 수익률 제출 (v3.1) — 소유자 인증 후 return_6m/on_leaderboard/public 기록.
+ * 수익률은 클라이언트가 backtest.js 로 계산해 전달(MVP).
+ */
+export async function submitReturn({ nickname, password, id, return6m }) {
+  return unwrap(
+    await supabase.rpc('submit_return', {
+      p_nickname: nickname,
+      p_password: password,
+      p_id: id,
+      p_return: return6m,
+    }),
+  );
+}

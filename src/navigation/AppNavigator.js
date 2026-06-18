@@ -3,6 +3,7 @@ import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { AccountScreen } from '@/screens/AccountScreen';
 import { ConsolidatedScreen } from '@/screens/ConsolidatedScreen';
+import { BrowseScreen } from '@/screens/BrowseScreen';
 import { colors } from '@/theme';
 import { SCREENSHOT_ENABLED, screenshotInitialTab } from '@/utils/screenshot';
 
@@ -50,6 +51,11 @@ export const AppNavigator = () => {
           name="Consolidated"
           component={ConsolidatedScreen}
           options={{ title: '통합' }}
+        />
+        <Tab.Screen
+          name="Browse"
+          component={BrowseScreen}
+          options={{ title: '둘러보기' }}
         />
       </Tab.Navigator>
     </NavigationContainer>

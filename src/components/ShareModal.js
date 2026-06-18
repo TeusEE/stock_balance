@@ -14,9 +14,12 @@ import {
 import * as Clipboard from 'expo-clipboard';
 import { colors, radius, spacing } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
-import { publishPortfolio } from '@/services/shareApi';
+import { publishPortfolio, submitReturn } from '@/services/shareApi';
 import { suggestNickname, isValidNickname } from '@/utils/nickname';
 import { containsBannedWord } from '@/utils/moderation';
+import { buildConsolidatedWeights, uniqueSymbolsForBacktest, computeBacktest } from '@/utils/backtest';
+import { fetchHistoricalCloses } from '@/services/stockApi';
+import { formatPercent } from '@/utils/format';
 
 /**
  * 포트폴리오 공유 모달.
@@ -31,10 +34,12 @@ export const ShareModal = ({ visible, onClose, defaultTitle = '내 포트폴리�
   const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
   const [eula, setEula] = useState(false);
+  const [isPublic, setIsPublic] = useState(false);
   const [step, setStep] = useState('form'); // 'form' | 'done'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [shareToken, setShareToken] = useState(null);
+  const [returnInfo, setReturnInfo] = useState(null); // 공개 등재 시 계산된 6개월 수익률
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -43,10 +48,12 @@ export const ShareModal = ({ visible, onClose, defaultTitle = '내 포트폴리�
       setNickname(savedNickname ?? '');
       setPassword('');
       setEula(false);
+      setIsPublic(false);
       setStep('form');
       setLoading(false);
       setError(null);
       setShareToken(null);
+      setReturnInfo(null);
       setCopied(false);
     }
   }, [visible, defaultTitle, savedNickname]);
@@ -76,9 +83,27 @@ export const ShareModal = ({ visible, onClose, defaultTitle = '내 포트폴리�
         title: title.trim(),
         baseCurrency,
         holdings,
-        visibility: 'unlisted',
+        visibility: isPublic ? 'public' : 'unlisted',
       });
       setShareToken(row?.share_token ?? null);
+
+      // 공개로 자랑하기: 기존 backtest.js 로 6개월 수익률을 계산해 제출(MVP).
+      // 계산/제출이 실패해도 공개 게시는 유지되며 순위는 최신순으로 노출된다.
+      if (isPublic && row?.id) {
+        try {
+          const weighted = buildConsolidatedWeights(holdings);
+          const symbols = uniqueSymbolsForBacktest(weighted);
+          const priceMap = symbols.length ? await fetchHistoricalCloses(symbols, '6mo') : {};
+          const bt = computeBacktest(weighted, priceMap);
+          const r = bt?.totalReturnPercent ?? null;
+          if (r != null) {
+            await submitReturn({ nickname: nickname.trim(), password, id: row.id, return6m: r });
+            setReturnInfo(r);
+          }
+        } catch (e) {
+          // 수익률 계산/제출 실패는 무시(공개는 유지)
+        }
+      }
       setStep('done');
     } catch (e) {
       setError(e?.message || '공유에 실패했습니다. 잠시 후 다시 시도해주세요.');
@@ -158,6 +183,28 @@ export const ShareModal = ({ visible, onClose, defaultTitle = '내 포트폴리�
                   다른 기기에서도 같은 별명·비밀번호로 내 공유물을 관리할 수 있어요. 이메일은 받지 않으므로 비밀번호 분실 시 복구가 불가합니다.
                 </Text>
 
+                <Text style={styles.label}>공개 범위</Text>
+                <View style={styles.visToggle}>
+                  {[
+                    { key: false, label: '코드로만 공유', desc: '받은 사람만 열람' },
+                    { key: true, label: '공개 + 순위 등재', desc: '둘러보기 탭에 노출' },
+                  ].map((opt) => (
+                    <Pressable
+                      key={String(opt.key)}
+                      onPress={() => setIsPublic(opt.key)}
+                      style={[styles.visBtn, isPublic === opt.key && styles.visBtnActive]}
+                    >
+                      <Text style={[styles.visLabel, isPublic === opt.key && styles.visLabelActive]}>{opt.label}</Text>
+                      <Text style={[styles.visDesc, isPublic === opt.key && styles.visLabelActive]}>{opt.desc}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+                {isPublic ? (
+                  <Text style={styles.note}>
+                    공개 시 6개월 백테스트 수익률이 계산되어 순위판에 노출됩니다(비중만 공개, 금액·수량 비공개).
+                  </Text>
+                ) : null}
+
                 <Pressable style={styles.eulaRow} onPress={() => setEula((v) => !v)}>
                   <View style={[styles.checkbox, eula && styles.checkboxOn]}>
                     {eula ? <Text style={styles.checkmark}>✓</Text> : null}
@@ -184,9 +231,17 @@ export const ShareModal = ({ visible, onClose, defaultTitle = '내 포트폴리�
             ) : (
               <>
                 <Text style={styles.doneTitle}>공유되었습니다 🎉</Text>
-                <Text style={styles.hint}>
-                  아래 공유 코드를 전달하세요. 받는 사람이 "공유 코드로 보기"에 붙여넣으면 열람할 수 있습니다.
-                </Text>
+                {isPublic ? (
+                  <Text style={styles.hint}>
+                    "둘러보기" 탭에 공개되었습니다.
+                    {returnInfo != null ? ` 6개월 수익률 ${formatPercent(returnInfo)} 로 순위판에 등재됨.` : ' (수익률은 곧 반영됩니다.)'}
+                    {'\n'}아래 공유 코드로도 직접 전달할 수 있습니다.
+                  </Text>
+                ) : (
+                  <Text style={styles.hint}>
+                    아래 공유 코드를 전달하세요. 받는 사람이 "공유 코드로 보기"에 붙여넣으면 열람할 수 있습니다.
+                  </Text>
+                )}
                 <View style={styles.tokenBox}>
                   <Text style={styles.tokenText} selectable numberOfLines={2}>
                     {shareToken}
@@ -244,6 +299,22 @@ const styles = StyleSheet.create({
   },
   suggestText: { color: colors.text, fontWeight: '600' },
   note: { color: colors.textDim, fontSize: 11, lineHeight: 16, marginTop: 2 },
+
+  visToggle: { flexDirection: 'row', gap: spacing.sm },
+  visBtn: {
+    flex: 1,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+  },
+  visBtnActive: { backgroundColor: colors.primaryDim, borderColor: colors.primary },
+  visLabel: { color: colors.text, fontWeight: '700', fontSize: 13 },
+  visLabelActive: { color: '#fff' },
+  visDesc: { color: colors.textDim, fontSize: 11, marginTop: 2 },
 
   eulaRow: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginTop: spacing.md },
   checkbox: {
