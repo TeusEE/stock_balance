@@ -20,7 +20,9 @@ App Store 배포 작업의 단계별 진행 상황을 기록합니다.
   - ✅ 데이터 레이어: `supabase.js` / `shareApi.js`(RPC) / `AuthContext`(별명+비번, Auth 미사용)
   - ✅ 순수 유틸 + 테스트: `shareSerialize`(민감정보 미전송) / `nickname` (전체 65 테스트 통과)
   - ✅ UI: `ShareModal`(공유 흐름) / `SharedViewer`(읽기전용) / `ViewSharedModal`(코드로 보기 + 신고/차단), 통합 화면 연결
-  - ⬜ 남은 것: UGC 신고를 비등록 열람자에게도 허용, 모더레이션 운영(is_hidden), 처리방침·App Privacy 갱신, 실기기 테스트 → 1.2.0 빌드
+  - ✅ UGC 1.2: 익명 신고(`report_shared`)+신고 3건 자동 숨김 / 비속어 필터(`moderation`) / 기기 로컬 차단(`localModeration`) / EULA (전체 68개 테스트 통과)
+  - ✅ 심사 문서 초안: `privacy-policy-v3.md` + `app-review-notes` 부록 (1.2.0 제출 시 라이브 게시)
+  - ⬜ 남은 것: **신고 마이그레이션 SQL 실행**(report_shared), RPC 레이트리밋, 실기기 테스트 → 1.2.0 빌드
 
 아래는 v1 첫 배포 당시의 단계별 기록(히스토리)입니다.
 

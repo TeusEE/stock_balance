@@ -55,7 +55,15 @@ export async function getSharedByToken(token) {
   return rows ?? null;
 }
 
-/** 신고 (UGC 1.2). */
+/**
+ * 익명 신고 (UGC 1.2) — 별명/비밀번호 없이 누구나 신고 가능.
+ * 서버에서 신고 누적이 임계치를 넘으면 자동으로 숨김 처리된다(`report_shared` RPC).
+ */
+export async function reportShared({ id, reason }) {
+  return unwrap(await supabase.rpc('report_shared', { p_id: id, p_reason: reason ?? null }));
+}
+
+/** 신고 (등록 사용자용 — 1인 1신고 보장). */
 export async function reportPortfolio({ nickname, password, id, reason }) {
   return unwrap(
     await supabase.rpc('report_portfolio', {

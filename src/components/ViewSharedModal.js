@@ -13,9 +13,9 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '@/theme';
-import { useAuth } from '@/context/AuthContext';
-import { getSharedByToken, reportPortfolio, blockUser } from '@/services/shareApi';
+import { getSharedByToken, reportShared } from '@/services/shareApi';
 import { SharedViewer } from '@/components/SharedViewer';
+import { blockAuthor, isShareReported, markShareReported } from '@/utils/localModeration';
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
@@ -30,11 +30,11 @@ function extractToken(input) {
  * 신고/차단(UGC 1.2)은 별명+비밀번호가 있을 때 동작한다.
  */
 export const ViewSharedModal = ({ visible, onClose }) => {
-  const { nickname, credentials } = useAuth();
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [payload, setPayload] = useState(null);
+  const [reported, setReported] = useState(false);
 
   useEffect(() => {
     if (visible) {
@@ -42,6 +42,7 @@ export const ViewSharedModal = ({ visible, onClose }) => {
       setLoading(false);
       setError(null);
       setPayload(null);
+      setReported(false);
     }
   }, [visible]);
 
@@ -61,6 +62,7 @@ export const ViewSharedModal = ({ visible, onClose }) => {
         setPayload(null);
       } else {
         setPayload(row);
+        setReported(await isShareReported(row.id));
       }
     } catch (e) {
       setError(e?.message || '불러오기에 실패했습니다.');
@@ -69,16 +71,8 @@ export const ViewSharedModal = ({ visible, onClose }) => {
     }
   };
 
-  const requireCreds = () => {
-    if (!credentials) {
-      Alert.alert('등록 필요', '신고/차단은 별명 등록 후 이용할 수 있어요. "포트폴리오 공유"에서 별명을 먼저 등록해주세요.');
-      return false;
-    }
-    return true;
-  };
-
   const handleReport = () => {
-    if (!payload || !requireCreds()) return;
+    if (!payload || reported) return;
     Alert.alert('신고', '이 공유물을 부적절한 콘텐츠로 신고할까요?', [
       { text: '취소', style: 'cancel' },
       {
@@ -86,12 +80,9 @@ export const ViewSharedModal = ({ visible, onClose }) => {
         style: 'destructive',
         onPress: async () => {
           try {
-            await reportPortfolio({
-              nickname: credentials.nickname,
-              password: credentials.password,
-              id: payload.id,
-              reason: null,
-            });
+            await reportShared({ id: payload.id, reason: null });
+            await markShareReported(payload.id);
+            setReported(true);
             Alert.alert('접수됨', '신고가 접수되었습니다. 검토 후 조치하겠습니다.');
           } catch (e) {
             Alert.alert('실패', e?.message || '신고에 실패했습니다.');
@@ -102,24 +93,16 @@ export const ViewSharedModal = ({ visible, onClose }) => {
   };
 
   const handleBlock = () => {
-    if (!payload || !requireCreds()) return;
-    Alert.alert('차단', '이 작성자의 콘텐츠를 더 이상 보지 않을까요?', [
+    if (!payload) return;
+    Alert.alert('작성자 차단', '이 작성자의 콘텐츠를 더 이상 보지 않을까요?', [
       { text: '취소', style: 'cancel' },
       {
         text: '차단',
         style: 'destructive',
         onPress: async () => {
-          try {
-            await blockUser({
-              nickname: credentials.nickname,
-              password: credentials.password,
-              blocked: payload.user_id,
-            });
-            Alert.alert('차단됨', '차단되었습니다.');
-            onClose();
-          } catch (e) {
-            Alert.alert('실패', e?.message || '차단에 실패했습니다.');
-          }
+          await blockAuthor(payload.user_id);
+          Alert.alert('차단됨', '이 작성자의 공유물은 앞으로 숨겨집니다.');
+          onClose();
         },
       },
     ]);
@@ -160,8 +143,12 @@ export const ViewSharedModal = ({ visible, onClose }) => {
                   <SharedViewer payload={payload} />
                 </View>
                 <View style={styles.actionRow}>
-                  <Pressable style={styles.modBtn} onPress={handleReport}>
-                    <Text style={styles.modText}>신고</Text>
+                  <Pressable
+                    style={[styles.modBtn, reported && styles.modBtnDim]}
+                    onPress={handleReport}
+                    disabled={reported}
+                  >
+                    <Text style={styles.modText}>{reported ? '신고됨' : '신고'}</Text>
                   </Pressable>
                   <Pressable style={styles.modBtn} onPress={handleBlock}>
                     <Text style={styles.modText}>작성자 차단</Text>
@@ -224,4 +211,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   modText: { color: colors.text, fontWeight: '600' },
+  modBtnDim: { opacity: 0.5 },
 });

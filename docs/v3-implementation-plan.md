@@ -1,15 +1,16 @@
 # v3 상세 구현 계획 (리비전) — 공유 대시보드 + 순위판 (Supabase)
 
-> 상태: **v3.0 구현 중** — 데이터 레이어 + 공유/뷰어 UI 완료(라이브 검증 통과). 남은 것: UGC 신고 보강·모더레이션·심사 문서·실기기 테스트.
+> 상태: **v3.0 구현 거의 완료** — 데이터 레이어·공유/뷰어 UI·UGC(익명 신고/자동 숨김/비속어 필터/로컬 차단) 완료. 남은 것: 심사 문서 갱신·레이트리밋·실기기 테스트.
 > 작성: 2026-06-09 · **리비전: 2026-06-18** · **진행 갱신: 2026-06-18**
 > 상위 문서: [`roadmap.md`](roadmap.md) · 출시 현황: [`../progress.md`](../progress.md)
 > 선행 조건: **1.1.0 App Store 배포 완료**(v2.0/v2.1 백테스트 포함). v3는 별도 버전으로 진행.
 >
 > **v3.0 진행 현황 요약**
-> - ✅ Supabase 프로젝트 + §4 스키마/RLS/RPC 적용(`pgcrypto` search_path 패치 포함), 라이브 스모크 9개 통과
-> - ✅ 데이터 레이어: `supabase.js` / `shareApi.js` / `AuthContext`(별명+비번) / `shareSerialize` / `nickname` (+테스트, 전체 65개 통과)
-> - ✅ UI: `ShareModal` / `SharedViewer` / `ViewSharedModal`(신고·차단) + 통합 화면 연결, `App.js` AuthProvider
-> - ⬜ UGC 신고를 비등록 열람자에게도 허용 · 모더레이션(is_hidden) · 비속어 필터 · 처리방침/App Privacy 갱신 · 레이트리밋 · 실기기 테스트
+> - ✅ Supabase 프로젝트 + §4 스키마/RLS/RPC 적용(`pgcrypto` search_path 패치 + `report_shared` 마이그레이션), 라이브 스모크 통과
+> - ✅ 데이터 레이어: `supabase.js` / `shareApi.js` / `AuthContext`(별명+비번) / `shareSerialize` / `nickname` (+테스트)
+> - ✅ UI: `ShareModal` / `SharedViewer` / `ViewSharedModal` + 통합 화면 연결, `App.js` AuthProvider
+> - ✅ UGC 1.2: 익명 신고(`report_shared`)+신고 3건 자동 숨김 · 비속어 필터(`moderation`) · 기기 로컬 차단(`localModeration`) · EULA. (전체 68개 테스트 통과)
+> - ⬜ 처리방침/App Privacy/심사 Notes 갱신 · RPC 레이트리밋 · 실기기 테스트
 
 이 문서는 기존 v3 계획을 **방향은 유지(공유 + 순위판)하되 약점을 보완**해 다시 쓴 실행용 계획이다.
 이전 버전(`v2-v3-implementation-plan.md`의 v3 섹션)은 폐기되었다.
@@ -62,7 +63,8 @@
 - [x] **Supabase Auth 사용 안 함** — Provider 설정 불필요. 별명+비밀번호는 앱 테이블(`app_users`)로 자체 관리(§3,§4)
 - [x] 둘러보기는 로그인 불필요(anon 키 + RLS 공개 읽기) — 설계로 충족
 - [x] SQL Editor에서 §4 스키마 + `pgcrypto` 확장 + RLS + RPC 실행 — 완료(+`auth_nickname` search_path=`public, extensions` 패치)
-- [ ] (보안) RPC 호출 레이트리밋으로 비밀번호 무차별 추측 방지 — **미완**
+- [ ] **UGC 마이그레이션 실행** — `reports.reporter` nullable + `report_shared` RPC(§4). 기존 스키마에 **추가 실행 필요**
+- [ ] (보안) RPC 호출 레이트리밋으로 비밀번호 무차별 추측·신고 남용 방지 — **미완**
 - [ ] (v3.1) Edge Functions 활성화 — 순위판 재계산 함수 배포(§6)
 - [ ] Auth → Rate limits 확인 (가입 남용 방지) — **미완**
 
@@ -164,14 +166,15 @@ create table shared_portfolios (
 );
 create index on shared_portfolios (visibility, on_leaderboard, return_6m desc);
 
--- 신고 / 차단 (UGC 1.2) — app_users.id 기준이라 '사용자 차단'이 가능
+-- 신고 / 차단 (UGC 1.2)
+-- reporter 는 nullable: 비등록 열람자도 익명 신고 가능(아래 report_shared). 등록자는 1인 1신고.
 create table reports (
   id uuid primary key default gen_random_uuid(),
-  reporter uuid not null references app_users on delete cascade,
+  reporter uuid references app_users on delete cascade,   -- null = 익명 신고
   portfolio_id uuid not null references shared_portfolios on delete cascade,
   reason text,
   created_at timestamptz default now(),
-  unique (reporter, portfolio_id)             -- 1인 1신고
+  unique (reporter, portfolio_id)             -- 1인 1신고(익명 null 은 중복 허용)
 );
 create table blocks (
   blocker uuid not null references app_users on delete cascade,
@@ -228,6 +231,19 @@ create or replace function get_shared_by_token(p_token uuid)
 returns setof shared_portfolios language sql security definer set search_path = public as $$
   select * from shared_portfolios where share_token = p_token and not is_hidden;
 $$;
+
+-- 익명 신고(별명/비번 불필요) + 신고 누적 3건 이상 자동 숨김 (UGC 1.2 모더레이션)
+create or replace function report_shared(p_id uuid, p_reason text default null)
+returns void language plpgsql security definer set search_path = public as $$
+declare cnt int;
+begin
+  insert into reports(reporter, portfolio_id, reason) values (null, p_id, p_reason);
+  select count(*) into cnt from reports where portfolio_id = p_id;
+  if cnt >= 3 then
+    update shared_portfolios set is_hidden = true where id = p_id;
+  end if;
+end; $$;
+grant execute on function report_shared(uuid, text) to anon, authenticated;
 
 -- return_6m / on_leaderboard 은 어떤 클라 입력 RPC에서도 받지 않음 → Edge Function(service_role)만 기록(§6).
 ```
@@ -290,10 +306,10 @@ export function toSharePayload({ title, baseCurrency, holdings }) {
 ### 7-1. UGC — Guideline 1.2
 닉네임·공유 포트폴리오·(v3.1)순위판은 사용자 생성 콘텐츠다.
 - [x] **EULA 동의** — 최초 공유 전 "불쾌한 콘텐츠 무관용" 약관 동의(`ShareModal` 내 체크박스, 미동의 시 공유 불가).
-- [~] **신고(report)** — `ViewSharedModal`에 신고 버튼 + `report_portfolio` RPC. ⚠️ **현재 별명 등록자만 가능** → 비등록 열람자도 가능하게 보강 필요.
-- [~] **차단(block)** — `ViewSharedModal`에 작성자 차단 + `block_user` RPC. (신고와 동일하게 등록자 한정)
-- [ ] **모더레이션** — 신고 콘텐츠 **24시간 내 조치**(MVP: 신고 임계치 → `is_hidden`, 운영자 수동 검토). 연락처 `xodn1311@gmail.com`. **미완**
-- [ ] **콘텐츠 필터** — 닉네임/제목 비속어 1차 필터(금지어 목록). **미완**
+- [x] **신고(report)** — `ViewSharedModal`에 신고 버튼 + **익명 신고 `report_shared` RPC(자격 불필요, 누구나 가능)**. 로컬 중복신고 방지(`localModeration`).
+- [x] **차단(block)** — `ViewSharedModal`에 작성자 차단 → 기기 로컬 차단목록(`localModeration.blockAuthor`). v3.1 공개 피드/순위판에서 필터링에 사용.
+- [x] **모더레이션** — `report_shared` 가 신고 누적 **3건 이상이면 `is_hidden=true` 자동 숨김**. + 운영자가 Supabase 대시보드에서 수동 검토(연락처 `xodn1311@gmail.com`).
+- [x] **콘텐츠 필터** — 별명/제목 비속어 1차 필터(`moderation.containsBannedWord`, `ShareModal` 제출 시 차단).
 
 > 2단계 출시 덕분에 v3.0은 공개 피드/순위판이 없어 노출 표면이 작다. 단, **링크 공유물도 UGC**이므로
 > 신고/차단/EULA는 v3.0부터 갖춘다.
@@ -306,11 +322,11 @@ v3부터 수집 신고:
 - 비밀번호는 **우리 DB에 bcrypt 해시**로 저장하는 인증 자격증명(평문 아님, 추적/광고 용도 아님).
 - 용도: App Functionality / Account Management. **추적(Tracking) 아님.** 광고/분석 SDK 없음 유지.
 
-### 7-3. 처리방침 / 심사 Notes 갱신
-- `docs/privacy-policy.md`: "서버로 전송되는 데이터" 섹션 — 별명·공유 비중·user id·(v3.1)수익률,
-  대상 Supabase, 사용자 삭제(unpublish/계정삭제) 가능, **이메일 미수집**, **금액/수량/현재가는 전송 안 함** 명시.
-- `docs/app-review-notes.md`: 외부 서비스에 **Supabase** 추가(인증=별명+비밀번호, 이메일 없음, RLS 보호), UGC 신고/차단 흐름.
-- 호스트 추가: `*.supabase.co`.
+### 7-3. 처리방침 / 심사 Notes 갱신 — 초안 준비됨 ✅ (게시는 1.2.0 제출 시)
+- [x] **`docs/privacy-policy-v3.md`** 초안 작성 — 공유 시 전송 데이터(별명·비중·user id), bcrypt 해시,
+  unpublish 가능, **이메일 미수집**·**금액/수량/현재가 미전송**, UGC 신고/차단. → **1.2.0 제출 시 `privacy-policy.md` 로 교체 게시.**
+- [x] **`docs/app-review-notes.md`** 에 "(1.2.0/v3.0 제출용 추가 메모)" 부록 추가 — App Privacy 전환 + Notes 영문 문단 + 호스트 `*.supabase.co`.
+- ⚠️ **라이브 `privacy-policy.md`(1.1.0, "데이터 미수집")는 1.1.0 가 살아있는 동안 변경하지 않는다.** 1.2.0 출시와 함께 교체.
 
 ---
 
@@ -333,6 +349,8 @@ v3부터 수집 신고:
 | `src/utils/shareSerialize.js` | v3.0 | ✅ | 비중만 추출(§5) + 테스트 |
 | `src/context/AuthContext.js` | v3.0 | ✅ | 별명+비밀번호 등록/검증(`auth_nickname` RPC), 자격 메모리 보관, `checkNicknameAvailable` |
 | `src/utils/nickname.js` | v3.0 | ✅ | 랜덤 별명 추천 + 정규화 + 검증(§3) + 테스트 |
+| `src/utils/moderation.js` | v3.0 | ✅ | 별명/제목 비속어 1차 필터(§7-1) + 테스트 |
+| `src/utils/localModeration.js` | v3.0 | ✅ | 기기 로컬 차단목록 + 중복신고 방지(AsyncStorage) |
 | `src/components/ShareModal.js` | v3.0 | ✅ | 별명(랜덤/직접)+비밀번호+EULA → 게시 → 공유 코드(구 `NicknameModal` 흡수) |
 | `src/components/SharedViewer.js` | v3.0 | ✅ | 읽기전용 뷰어(도넛+리스트, 비중만) |
 | `src/components/ViewSharedModal.js` | v3.0 | ✅ | 공유 코드로 열람 + 신고/차단(구 `SharedDetailScreen` 대체, 모달 방식) |
@@ -374,9 +392,10 @@ v3부터 수집 신고:
 1. [x] deps + `supabase.js`(§3) + `nickname.js` + `AuthContext`(별명+비밀번호 RPC) + §4 스키마/RPC(pgcrypto) + `app.json extra`.
 2. [x] `shareSerialize`(+테스트) + `shareApi`(publish/update/unpublish/getByToken) + `ShareModal`(별명+비밀번호+EULA).
 3. [x] `SharedViewer` + `ViewSharedModal`(공유 코드로 열람) + 통합 화면 "공유" 버튼.
-4. [~] UGC 기본: 신고/차단 ✅(등록자 한정) · `is_hidden`/비속어 필터 ⬜ · **비등록 열람자 신고 허용 보강 필요**(§7-1).
-5. [ ] 심사 문서: 처리방침·App Privacy·Notes 갱신(§7) → 1.2.0 빌드·제출(1.1.0 통과 후).
+4. [x] UGC: 익명 신고(`report_shared`)+신고 3건 자동 숨김 · 비속어 필터(`moderation`) · 기기 로컬 차단(`localModeration`) · EULA(§7-1).
+5. [~] 심사 문서: 초안 준비 완료(`privacy-policy-v3.md` + `app-review-notes` 부록, §7-3). **1.2.0 제출 시 라이브 게시** 남음.
 6. [ ] 실기기 테스트: 공유 → 코드 → 다른 기기 열람, 신고/차단 동작 확인(§10).
+7. [ ] (선결) RPC 레이트리밋 설정(비번 추측·신고 남용 방지, §2).
 
 **v3.1 (공개 피드 + 순위판, 1.3.0)**
 6. `visibility='public'` 허용 + `ShareDashboardScreen`(공개 피드).
@@ -394,3 +413,6 @@ v3부터 수집 신고:
 - 서버 재계산은 Yahoo 시세 의존(레이트리밋·결측 시 등재 보류). 배당·환차익·거래비용 미반영(v2 모델 승계, 6개월 고정).
 - 모더레이션 MVP는 수동 검토 + 임계치 자동숨김. 신고량 증가 시 자동화(Edge Function) 필요.
 - `unlisted` 토큰이 유출되면 해당 링크는 누구나 열람(설계상 "링크를 아는 사람" 공유).
+- 익명 신고는 악용(특정 글 깎아내리기) 가능 → 자동 숨김은 신고 3건 임계치 + **운영자 수동 검토**로 보완. 임계치 조정·신고자 식별은 신고량 보며 강화.
+- 비속어 필터는 1차 금지어 목록 수준(우회 가능). 신고/모더레이션이 2차 방어선.
+- 기기 로컬 차단은 v3.0에선 기록만(공개 피드가 없어 가시 효과 없음) — v3.1 피드/순위판에서 실제 필터링.

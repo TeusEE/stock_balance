@@ -62,7 +62,11 @@ function ok(label, cond, extra) {
   ok('app_users 직접 SELECT 차단(빈 결과/거부)', direct.error || (direct.data?.length ?? 0) === 0,
     direct.error?.message);
 
-  // 7) 정리: 게시물 삭제(테스트 유저는 남음)
+  // 6.5) 익명 신고 (별명/비번 없이)
+  const rep = await supabase.rpc('report_shared', { p_id: row?.id, p_reason: '스모크 테스트' });
+  ok('report_shared (익명 신고)', !rep.error, rep.error?.message ?? '(report_shared 미배포면 마이그레이션 실행 필요)');
+
+  // 7) 정리: 게시물 삭제(테스트 유저는 남음, 신고는 cascade 삭제)
   const del = await supabase.rpc('unpublish_portfolio', { p_nickname: NICK, p_password: PW, p_id: row?.id });
   ok('unpublish_portfolio (정리)', !del.error, del.error?.message);
 

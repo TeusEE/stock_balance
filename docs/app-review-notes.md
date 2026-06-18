@@ -46,11 +46,29 @@ Support contact: xodn1311@gmail.com
 
 ---
 
-## 보조: App Privacy 설문 답변 가이드
+## 보조: App Privacy 설문 답변 가이드 (현재 1.1.0)
 
 App Store Connect → App Privacy 에서 데이터 수집 항목을 묻습니다.
-이 앱은 모든 항목에 **"Data Not Collected"** 로 답할 수 있습니다.
+**1.1.0(공유 기능 없음)** 까지는 모든 항목에 **"Data Not Collected"** 로 답할 수 있습니다.
 근거:
 - 권한 요청 0건 (`src/` 어디에도 `Permissions*` / `expo-camera`/`expo-location` 등 import 없음)
-- 외부 호스트는 Yahoo Finance 1곳뿐, 어떤 식별자도 전송 안 함
+- 외부 호스트는 Naver/Yahoo 뿐, 어떤 식별자도 전송 안 함
 - 모든 사용자 데이터는 AsyncStorage 로컬 저장
+
+---
+
+## (1.2.0 / v3.0 제출용 추가 메모 — 공유 기능 포함 시에만 적용)
+
+> ⚠️ 아래는 **공유 기능이 들어간 1.2.0** 제출 때 사용. 1.1.0 심사에는 사용하지 않음.
+> 처리방침은 `privacy-policy-v3.md` 를 라이브로 게시한 뒤 제출.
+
+**App Privacy 설문 변경 (Data Not Collected → 수집 신고)**
+- **Identifiers → User ID**: 익명 user id (Linked, 추적 아님)
+- **User Content → Other User Content**: 별명, 공유 포트폴리오(종목+비중), 제목
+- 이메일/전화/위치/추적 식별자 **미수집** 유지. 광고·분석 SDK 없음.
+- 비밀번호는 우리 DB에 **bcrypt 해시**로 저장(인증 자격증명, 추적 아님).
+
+**Notes 에 추가할 문단 (영문)**
+```
+SHARING (v1.2.0): An optional "Share Portfolio" feature lets a user publish ONLY portfolio weights (security name, ticker, category, target %) to our backend (Supabase). Amounts, owned shares, current prices, and total assets are never sent. Auth uses a self-chosen nickname + password (bcrypt-hashed server-side; NO email/phone/social, no Supabase Auth). Browsing/market data still require no login. User-generated content (nicknames, shared portfolios) has in-app REPORT and BLOCK, an EULA acceptance before first publish, a profanity filter on nickname/title, and auto-hide after a report threshold plus manual review. Users can unpublish their shared items anytime. Added host: https://<project>.supabase.co.
+```

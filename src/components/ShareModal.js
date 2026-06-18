@@ -16,6 +16,7 @@ import { colors, radius, spacing } from '@/theme';
 import { useAuth } from '@/context/AuthContext';
 import { publishPortfolio } from '@/services/shareApi';
 import { suggestNickname, isValidNickname } from '@/utils/nickname';
+import { containsBannedWord } from '@/utils/moderation';
 
 /**
  * 포트폴리오 공유 모달.
@@ -61,6 +62,10 @@ export const ShareModal = ({ visible, onClose, defaultTitle = '내 포트폴리�
   const handleSubmit = async () => {
     Keyboard.dismiss();
     if (!canSubmit) return;
+    if (containsBannedWord(nickname) || containsBannedWord(title)) {
+      setError('별명/제목에 부적절한 표현이 포함되어 있습니다.');
+      return;
+    }
     setLoading(true);
     setError(null);
     try {
