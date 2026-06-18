@@ -43,9 +43,16 @@
 링크(공유 코드)로 받은 공유물 **읽기전용 뷰어** / 신고·차단·EULA(1.2 기본 대응) / 처리방침·App Privacy 갱신.
 **핵심**: 공개 "탐색 피드"와 순위판은 **아직 없음** → 무한 노출되는 UGC 표면이 작아 첫 심사 리스크 최소화.
 
-### v3.1 — 공개 피드 + 순위판 (예: 1.3.0)
-**포함**: 공개(`public`) 가시성 / 공개 탐색 피드 / **순위판(서버 재계산 수익률 내림차순)** /
-"포트폴리오 자랑하기" / 강화된 모더레이션(자동 숨김 임계치, 비속어 필터).
+### v3.1 — "둘러보기" 탭 (공개 피드 + 순위 + 검색) (예: 1.3.0)
+**포함**: 공개(`public`) 가시성 + "자랑하기"(공개 등재 시 **서버가 6개월 수익률 계산**) /
+다른 사람의 포트폴리오를 구경하는 **"둘러보기" 탭 1개**, 다음 4가지 기능:
+- ① **상위 5개 순위** — 공개 포트폴리오를 6개월 수익률 내림차순 Top 5
+- ② **작성자 별명 검색**
+- ③ **특정 종목 포함 포트폴리오 검색**(종목명 또는 티커)
+- ④ **더보기** — 10개씩 추가 로드(페이지네이션)
+
+읽기전용 뷰어(`SharedViewer`) 재사용, 기기 로컬 차단(`localModeration`) 필터 적용. **상세는 §6-A.**
+> 모더레이션·비속어 필터·EULA·신고·차단은 **v3.0에서 이미 구현** — v3.1은 임계치 조정 등 강화만.
 
 ### 제외(차기)
 소셜 로그인(추가 시 Apple 4.8 고려), 팔로우/댓글/좋아요, 환차익 반영(취소됨), 다기간 백테스트.
@@ -301,6 +308,89 @@ export function toSharePayload({ title, baseCurrency, holdings }) {
 
 ---
 
+## 6-A. "둘러보기" 탭 (v3.1) — 순위 · 검색 · 더보기
+
+다른 사람의 공개 포트폴리오를 구경하는 **단일 탭**. 4가지 요구사항을 한 화면(`BrowseScreen`)에서 처리한다.
+
+### 화면 구성 (`src/screens/BrowseScreen.js`)
+```
+[ 둘러보기 ]
+ ┌ 검색바: ( 별명 | 종목 ) 토글 + 입력 + 검색
+ ├ (검색어 없을 때) 🏆 수익률 Top 5  ← 요구사항 ①
+ │    1. 닉네임 · 제목 · +12.3%   (탭 → SharedViewer)
+ │    ...
+ ├ (검색 결과) 목록 (요구사항 ②/③)
+ └ [ 더보기 ] ← 요구사항 ④ (10개씩 추가)
+```
+- 항목 탭 → `SharedViewer`(읽기전용, 비중만). 카드에 닉네임·제목·수익률(있으면)·대표 종목 미리보기.
+- **기기 로컬 차단 필터**: `localModeration.getBlockedAuthors()` 로 가져와 `user_id` 가 차단 목록이면 클라이언트에서 제외.
+- 본인 글 제외(선택): 로그인된 별명이 있으면 같은 닉네임 숨김.
+
+### 데이터 흐름 / 정렬 / 페이지네이션
+- 기본(검색어 없음): `browse_public(p_sort='return', limit=5, offset=0)` → 수익률 Top 5.
+- "더보기": 같은 조건으로 `offset` 을 누적(+10), `limit=10` 으로 추가 호출 → 리스트에 append.
+  반환 개수가 `limit` 과 같으면 더 있을 수 있으므로 "더보기" 버튼 유지, 적으면 숨김.
+- 정렬: `return_6m` 내림차순(`nulls last`) → 동률/널은 최신순(`created_at desc`).
+- 검색: 별명(②) / 종목(③) 중 하나로 필터. 검색 시에도 같은 정렬·더보기 사용.
+
+### 신규 RPC — `browse_public` (§4 에 함께 둠)
+공개 읽기는 RLS(`sp_public_read`)로도 가능하지만, **별명 조인 + 종목 검색 + share_token 비노출**을
+한 번에 처리하기 위해 전용 `security definer` RPC 를 둔다(필요한 컬럼만 반환, `share_token` 제외).
+```sql
+-- 둘러보기: 공개 포트폴리오 목록 (순위/별명검색/종목검색/페이지네이션)
+--  p_sort: 'return'(수익률순) | 'recent'(최신순)
+--  p_nickname: 작성자 별명 부분검색(옵션, ②)
+--  p_symbol:   보유 종목 티커 또는 종목명 부분검색(옵션, ③)
+create or replace function browse_public(
+  p_sort text default 'return',
+  p_nickname text default null,
+  p_symbol text default null,
+  p_limit int default 5,
+  p_offset int default 0
+) returns table (
+  id uuid, title text, nickname text, user_id uuid, base_currency text,
+  holdings jsonb, return_6m numeric, return_computed_at timestamptz, created_at timestamptz
+) language sql security definer set search_path = public as $$
+  select s.id, s.title, u.nickname, s.user_id, s.base_currency,
+         s.holdings, s.return_6m, s.return_computed_at, s.created_at
+  from shared_portfolios s
+  join app_users u on u.id = s.user_id
+  where s.visibility = 'public' and not s.is_hidden
+    and (p_nickname is null or u.nickname ilike '%' || p_nickname || '%')
+    and (p_symbol is null or exists (
+          select 1 from jsonb_array_elements(s.holdings) h
+          where upper(h->>'symbol') = upper(p_symbol)
+             or h->>'name' ilike '%' || p_symbol || '%'))
+  order by
+    case when p_sort = 'return' then s.return_6m end desc nulls last,
+    s.created_at desc
+  limit greatest(1, least(p_limit, 50))
+  offset greatest(0, p_offset);
+$$;
+grant execute on function browse_public(text, text, text, int, int) to anon, authenticated;
+
+-- (스케일 시) 종목 '심볼 정확 일치' 검색 가속용 — 종목명 부분검색엔 무효
+create index if not exists shared_portfolios_holdings_gin on shared_portfolios using gin (holdings);
+```
+
+### 공개 가시성 + 수익률 계산 연계 (선결)
+- `BrowseScreen` 에 뜨려면 포트폴리오가 **`visibility='public'`** 이어야 한다 → `ShareModal` 에
+  "**공개로 자랑하기**" 옵션 추가(기존 `unlisted` 코드 공유와 별개 선택지).
+- 요구사항 ①(수익률 Top 5)이 의미를 가지려면 공개 글에 **`return_6m` 이 있어야** 한다 →
+  공개 게시/자랑하기 시 **Edge Function `recompute-return`(§6) 호출로 서버가 계산**해 채운다.
+  (아직 계산 전인 공개 글은 `return_6m=null` 로 순위 뒤로 밀리고 최신순에 노출.)
+
+### 신규/변경 코드 (v3.1)
+| 파일 | 역할 |
+|---|---|
+| `src/screens/BrowseScreen.js` (신규) | 둘러보기 탭: 검색바 + Top5 + 결과 리스트 + 더보기 |
+| `src/services/shareApi.js` (확장) | `browsePublic({ sort, nickname, symbol, limit, offset })` RPC 래퍼 |
+| `src/components/ShareModal.js` (확장) | "공개로 자랑하기" 옵션(+ 게시 후 `recompute-return` 호출) |
+| `src/navigation/AppNavigator.js` (확장) | 하단 탭에 **"둘러보기"** 추가 |
+| `supabase/functions/recompute-return/` (신규) | 공개 게시 시 6개월 수익률 서버 계산(§6) |
+
+---
+
 ## 7. App Store 컴플라이언스 (필수)
 
 ### 7-1. UGC — Guideline 1.2
@@ -355,12 +445,13 @@ v3부터 수집 신고:
 | `src/components/SharedViewer.js` | v3.0 | ✅ | 읽기전용 뷰어(도넛+리스트, 비중만) |
 | `src/components/ViewSharedModal.js` | v3.0 | ✅ | 공유 코드로 열람 + 신고/차단(구 `SharedDetailScreen` 대체, 모달 방식) |
 | `scripts/check-supabase.js` | v3.0 | ✅ | 라이브 스모크(등록/게시/토큰조회/비번오류/RLS/정리) |
-| `src/screens/ShareDashboardScreen.js` | v3.1 | ⬜ | 공개 피드 탐색 |
-| `src/screens/LeaderboardScreen.js` | v3.1 | ⬜ | 수익률 내림차순 순위판 |
-| `supabase/functions/recompute-return/` | v3.1 | ⬜ | 순위판 수익률 서버 재계산(§6) |
+| `src/screens/BrowseScreen.js` | v3.1 | ⬜ | "둘러보기" 탭: Top5 순위 + 별명/종목 검색 + 더보기(§6-A) |
+| `browse_public` RPC + `shareApi.browsePublic` | v3.1 | ⬜ | 공개 목록 조회(순위/검색/페이지네이션, §6-A) |
+| `ShareModal` "공개로 자랑하기" 옵션 | v3.1 | ⬜ | 공개 게시 + `recompute-return` 호출(§6-A) |
+| `supabase/functions/recompute-return/` | v3.1 | ⬜ | 공개 게시 시 6개월 수익률 서버 계산(§6) |
 
 > 메모: v3.0 은 공유 진입을 별도 탭/스택 대신 **통합 화면의 버튼 + 모달**(`ShareModal`/`ViewSharedModal`)로 구현했다.
-> 전용 탭/스택(`ShareDashboard → SharedDetail → Leaderboard`)은 v3.1 공개 피드와 함께 도입.
+> v3.1 은 하단 탭에 **"둘러보기"** 1개를 추가하고, 항목 탭 시 `SharedViewer` 로 읽기전용 표시(별도 상세 화면/스택 불필요).
 
 ### 재사용
 - `src/utils/aggregate.js`(`aggregateAcrossAccounts`/`aggregateByCategory`) — 뷰어 비중 분포.
@@ -381,8 +472,9 @@ v3부터 수집 신고:
 - [x] 라이브 스모크(`node scripts/check-supabase.js`): `auth_nickname`(등록/검증/틀린비번 거부), `publish`/`get_shared_by_token`, `public_profiles`(해시 미노출), **`app_users` 직접 SELECT 차단(RLS)**, 정리 — 9개 통과.
 - [x] `return_6m`/`on_leaderboard` 위조 방지: 클라 입력 RPC에 해당 컬럼 없음 + anon 직접 UPDATE는 RLS 차단(트리거 불필요).
 - [ ] (v3.1) Edge Function: 위조한 `return_6m` 제출해도 서버 재계산값으로 덮어쓰는지.
+- [ ] (v3.1) `browse_public`: ① 수익률 desc Top5 정렬(널 뒤), ② 별명 부분검색, ③ 종목명/티커 검색, ④ limit/offset 페이지네이션, `share_token` 미반환 검증.
 - [ ] 실기기: 별명+비밀번호 등록 → 공유 → 다른 기기에서 같은 별명+비밀번호로 내 공유물 관리(영속성).
-- [ ] 둘러보기/공개 피드(v3.1): 로그인 없이 조회(anon 키 + RLS 공개 읽기).
+- [ ] 둘러보기(v3.1): 로그인 없이 Top5/검색/더보기 조회, 차단한 작성자 제외.
 
 ---
 
@@ -397,11 +489,11 @@ v3부터 수집 신고:
 6. [ ] 실기기 테스트: 공유 → 코드 → 다른 기기 열람, 신고/차단 동작 확인(§10).
 7. [ ] (선결) RPC 레이트리밋 설정(비번 추측·신고 남용 방지, §2).
 
-**v3.1 (공개 피드 + 순위판, 1.3.0)**
-6. `visibility='public'` 허용 + `ShareDashboardScreen`(공개 피드).
-7. `supabase/functions/recompute-return`(§6, v2 백테스트 서버 포팅) + `submitToLeaderboard`.
-8. `LeaderboardScreen`(서버 재계산 수익률 내림차순) + "자랑하기" 버튼.
-9. 모더레이션 강화(자동 숨김 임계치) + 심사 문서 갱신 → 1.3.0 제출.
+**v3.1 ("둘러보기" 탭, 1.3.0)**
+6. `ShareModal` "공개로 자랑하기" 옵션(`visibility='public'`) + `recompute-return` Edge Function(§6)으로 `return_6m` 계산.
+7. `browse_public` RPC + GIN 인덱스(§6-A) + `shareApi.browsePublic` 래퍼.
+8. `BrowseScreen`: ① Top5 순위 · ② 별명 검색 · ③ 종목 검색 · ④ 더보기(+10) · 로컬 차단 필터. 하단 탭 "둘러보기" 추가.
+9. 모더레이션 임계치 조정 + 심사 문서(공개 피드 반영) 갱신 → 1.3.0 제출.
 
 ---
 
@@ -415,4 +507,7 @@ v3부터 수집 신고:
 - `unlisted` 토큰이 유출되면 해당 링크는 누구나 열람(설계상 "링크를 아는 사람" 공유).
 - 익명 신고는 악용(특정 글 깎아내리기) 가능 → 자동 숨김은 신고 3건 임계치 + **운영자 수동 검토**로 보완. 임계치 조정·신고자 식별은 신고량 보며 강화.
 - 비속어 필터는 1차 금지어 목록 수준(우회 가능). 신고/모더레이션이 2차 방어선.
-- 기기 로컬 차단은 v3.0에선 기록만(공개 피드가 없어 가시 효과 없음) — v3.1 피드/순위판에서 실제 필터링.
+- 기기 로컬 차단은 v3.0에선 기록만(공개 피드가 없어 가시 효과 없음) — v3.1 **둘러보기 탭에서 실제 필터링**.
+- (v3.1) 공개 글에 `return_6m` 이 없으면 "수익률 Top5"가 비거나 최신순으로 채워짐 → 공개 게시 시 Edge 계산 필수(§6-A).
+- (v3.1) 종목 검색의 **종목명 부분검색**은 GIN 인덱스로 가속 안 됨(전체 스캔) → 데이터 증가 시 심볼 정확검색 위주로 조정하거나 종목 인덱스 테이블 도입 검토.
+- (v3.1) 공개 피드는 누구나 열람 → 노출 표면이 커지므로 신고/자동숨김/비속어 필터(v3.0)가 1차 방어, 운영 모니터링 강화 필요.
