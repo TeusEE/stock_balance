@@ -85,6 +85,18 @@ function ok(label, cond, extra) {
   const byName = await supabase.rpc('browse_public', { p_sort: 'return', p_nickname: null, p_symbol: '삼성', p_limit: 10, p_offset: 0 });
   ok('browse_public 종목명 검색(삼성)', !byName.error && (byName.data ?? []).some((r) => r.id === row?.id), byName.error?.message);
 
+  // 6.8) 내 공유물 목록/수정 (수정·삭제 기능)
+  const mine = await supabase.rpc('list_mine', { p_nickname: NICK, p_password: PW });
+  ok('list_mine 내 공유물 포함', !mine.error && (mine.data ?? []).some((r) => r.id === row?.id),
+    mine.error ? `${mine.error.message} — list_mine 마이그레이션 실행 필요` : '');
+
+  const upd = await supabase.rpc('update_portfolio', {
+    p_nickname: NICK, p_password: PW, p_id: row?.id, p_title: '스모크 수정됨', p_holdings: null, p_visibility: null,
+  });
+  ok('update_portfolio (제목 수정 + holdings 유지)',
+    !upd.error && upd.data?.title === '스모크 수정됨' && Array.isArray(upd.data?.holdings) && upd.data.holdings.length === 2,
+    upd.error?.message);
+
   // 7) 정리: 게시물 삭제(테스트 유저는 남음, 신고는 cascade 삭제)
   const del = await supabase.rpc('unpublish_portfolio', { p_nickname: NICK, p_password: PW, p_id: row?.id });
   ok('unpublish_portfolio (정리)', !del.error, del.error?.message);

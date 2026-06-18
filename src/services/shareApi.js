@@ -26,7 +26,7 @@ export async function publishPortfolio({ nickname, password, title, baseCurrency
   );
 }
 
-/** 기존 공유물 수정(본인만). */
+/** 기존 공유물 수정(본인만) — 종목 구성까지 새로 덮어쓸 때. */
 export async function updatePortfolio({ nickname, password, id, title, baseCurrency, holdings, visibility }) {
   const payload = toSharePayload({ title, baseCurrency, holdings });
   return unwrap(
@@ -39,6 +39,28 @@ export async function updatePortfolio({ nickname, password, id, title, baseCurre
       p_visibility: visibility ?? null,
     }),
   );
+}
+
+/**
+ * 공유물 메타(제목/공개범위)만 수정 — 종목 구성(holdings)은 건드리지 않는다.
+ * `update_portfolio` 에 p_holdings=null 을 넘기면 서버 coalesce 로 기존 holdings 유지.
+ */
+export async function updateShared({ nickname, password, id, title = null, visibility = null }) {
+  return unwrap(
+    await supabase.rpc('update_portfolio', {
+      p_nickname: nickname,
+      p_password: password,
+      p_id: id,
+      p_title: title,
+      p_holdings: null,
+      p_visibility: visibility,
+    }),
+  );
+}
+
+/** 내가 등록한 공유물 목록(본인만) — 별명+비밀번호 인증 후 전체 반환. */
+export async function listMine({ nickname, password }) {
+  return unwrap(await supabase.rpc('list_mine', { p_nickname: nickname, p_password: password }));
 }
 
 /** 공유 취소(삭제, 본인만). */

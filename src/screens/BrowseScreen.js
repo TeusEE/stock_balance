@@ -15,6 +15,7 @@ import { formatPercent } from '@/utils/format';
 import { browsePublic } from '@/services/shareApi';
 import { getBlockedAuthors } from '@/utils/localModeration';
 import { SharedDetailModal } from '@/components/SharedDetailModal';
+import { MySharesModal } from '@/components/MySharesModal';
 
 const TOP_N = 5; // 요구사항 ①: 상위 5개
 const PAGE = 10; // 요구사항 ④: 더보기 10개씩
@@ -28,6 +29,7 @@ export const BrowseScreen = () => {
   const [error, setError] = useState(null);
   const [hasMore, setHasMore] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [manageVisible, setManageVisible] = useState(false);
 
   const offsetRef = useRef(0); // 서버에서 가져온 raw 개수(차단 필터 전)
   const blockedRef = useRef(new Set());
@@ -109,7 +111,12 @@ export const BrowseScreen = () => {
   return (
     <SafeAreaView style={styles.safe} edges={['top']}>
       <View style={styles.headerWrap}>
-        <Text style={styles.title}>둘러보기</Text>
+        <View style={styles.titleRow}>
+          <Text style={styles.title}>둘러보기</Text>
+          <Pressable onPress={() => setManageVisible(true)} hitSlop={8}>
+            <Text style={styles.manageLink}>내 공유물</Text>
+          </Pressable>
+        </View>
 
         {/* 검색 모드 토글 */}
         <View style={styles.modeToggle}>
@@ -187,6 +194,14 @@ export const BrowseScreen = () => {
           setItems((prev) => prev.filter((it) => it.user_id !== uid));
         }}
       />
+
+      <MySharesModal
+        visible={manageVisible}
+        onClose={() => {
+          setManageVisible(false);
+          fetchPage(true, activeQuery, mode); // 수정/삭제 반영 위해 목록 새로고침
+        }}
+      />
     </SafeAreaView>
   );
 };
@@ -194,7 +209,9 @@ export const BrowseScreen = () => {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   headerWrap: { padding: spacing.lg, gap: spacing.sm },
+  titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   title: { color: colors.text, fontSize: 20, fontWeight: '700' },
+  manageLink: { color: colors.primary, fontSize: 14, fontWeight: '600' },
 
   modeToggle: {
     flexDirection: 'row',
