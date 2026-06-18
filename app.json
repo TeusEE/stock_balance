@@ -28,7 +28,9 @@
     "extra": {
       "eas": {
         "projectId": "748e89e0-8700-4a42-93b5-738f41f291ab"
-      }
+      },
+      "supabaseUrl": "https://zbjpvtrwdiuihuzkhkye.supabase.co",
+      "supabaseAnonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpianB2dHJ3ZGl1aWh1emtoa3llIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODE3NzQ3ODAsImV4cCI6MjA5NzM1MDc4MH0.Ul88MGQaShRT5e_XlCfLWk1XSeqDe7bjQ_KCcsCLzso"
     }
   }
 }

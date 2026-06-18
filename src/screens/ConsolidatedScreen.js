@@ -9,6 +9,8 @@ import { formatCurrency, formatPercent } from '@/utils/format';
 import { DonutChart } from '@/components/DonutChart';
 import { ExportButtons } from '@/components/ExportButtons';
 import { BACKTEST_MODES, BacktestModal } from '@/components/BacktestModal';
+import { ShareModal } from '@/components/ShareModal';
+import { ViewSharedModal } from '@/components/ViewSharedModal';
 import { buildConsolidatedExport } from '@/utils/exportData';
 import {
   buildConsolidatedWeights,
@@ -23,6 +25,10 @@ export const ConsolidatedScreen = () => {
   const [base, setBase] = useState('KRW');
   const [viewMode, setViewMode] = useState(screenshotConsolidatedViewMode()); // 'symbol' | 'group'
   const [expandedGroups, setExpandedGroups] = useState(screenshotConsolidatedExpanded());
+
+  // 공유 (v3.0)
+  const [shareVisible, setShareVisible] = useState(false);
+  const [viewVisible, setViewVisible] = useState(false);
 
   const { totalBase, holdings } = useMemo(
     () => aggregateAcrossAccounts(state.accounts, base, usdToKrw),
@@ -147,6 +153,24 @@ export const ConsolidatedScreen = () => {
           </Pressable>
         )}
 
+        {/* 공유 (v3.0) */}
+        <View style={styles.shareRow}>
+          {holdings.length > 0 && (
+            <Pressable
+              style={[styles.shareBtn, styles.sharePrimary]}
+              onPress={() => setShareVisible(true)}
+            >
+              <Text style={styles.sharePrimaryText}>포트폴리오 공유</Text>
+            </Pressable>
+          )}
+          <Pressable
+            style={[styles.shareBtn, styles.shareSecondary]}
+            onPress={() => setViewVisible(true)}
+          >
+            <Text style={styles.shareSecondaryText}>공유 코드로 보기</Text>
+          </Pressable>
+        </View>
+
         {/* 그룹별 범례 (그룹 모드일 때) */}
         {viewMode === 'group' && groups.length > 0 && (
           <View style={styles.legendRow}>
@@ -264,6 +288,14 @@ export const ConsolidatedScreen = () => {
         error={backtestError}
         onRefresh={runBacktest}
       />
+
+      <ShareModal
+        visible={shareVisible}
+        onClose={() => setShareVisible(false)}
+        baseCurrency={base}
+        holdings={holdings}
+      />
+      <ViewSharedModal visible={viewVisible} onClose={() => setViewVisible(false)} />
     </SafeAreaView>
   );
 };
@@ -409,4 +441,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   backtestBtnText: { color: '#fff', fontWeight: '700', fontSize: 15 },
+
+  shareRow: { flexDirection: 'row', gap: spacing.sm },
+  shareBtn: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sharePrimary: { backgroundColor: colors.primaryDim },
+  sharePrimaryText: { color: '#fff', fontWeight: '700', fontSize: 14 },
+  shareSecondary: { backgroundColor: colors.cardAlt, borderWidth: 1, borderColor: colors.border },
+  shareSecondaryText: { color: colors.text, fontWeight: '600', fontSize: 14 },
 });

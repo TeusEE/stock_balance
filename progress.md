@@ -15,7 +15,12 @@ App Store 배포 작업의 단계별 진행 상황을 기록합니다.
   실기기 테스트에서 발견한 UX/버그(한글·ETF 검색, 키보드 닫기, 백테스트 캐시, 모달 닫기, 한글명 표시)를
   수정한 버전. 자세한 변경은 [`CHANGELOG.md`](CHANGELOG.md).
   - v2.2(환차익 FX)는 **취소**되어 미포함 — [`docs/roadmap.md`](docs/roadmap.md) 참조.
-- **다음 단계**: v3는 방향을 재검토(리비전) 중. 상세 계획은 [`docs/v3-implementation-plan.md`](docs/v3-implementation-plan.md).
+- **v3.0 구현 진행 중** (공유 + 읽기전용 뷰어). 상세 계획: [`docs/v3-implementation-plan.md`](docs/v3-implementation-plan.md).
+  - ✅ Supabase 프로젝트 + 스키마/RLS/RPC 적용, 라이브 스모크 테스트 9개 통과(`scripts/check-supabase.js`)
+  - ✅ 데이터 레이어: `supabase.js` / `shareApi.js`(RPC) / `AuthContext`(별명+비번, Auth 미사용)
+  - ✅ 순수 유틸 + 테스트: `shareSerialize`(민감정보 미전송) / `nickname` (전체 65 테스트 통과)
+  - ✅ UI: `ShareModal`(공유 흐름) / `SharedViewer`(읽기전용) / `ViewSharedModal`(코드로 보기 + 신고/차단), 통합 화면 연결
+  - ⬜ 남은 것: UGC 신고를 비등록 열람자에게도 허용, 모더레이션 운영(is_hidden), 처리방침·App Privacy 갱신, 실기기 테스트 → 1.2.0 빌드
 
 아래는 v1 첫 배포 당시의 단계별 기록(히스토리)입니다.
 

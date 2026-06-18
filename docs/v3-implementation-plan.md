@@ -194,8 +194,9 @@ create policy sp_public_read on shared_portfolios for select
 create view public_profiles as select id, nickname from app_users;
 
 -- 별명+비밀번호 검증/등록 → user_id 반환 (해시 비교는 DB 내부에서만)
+-- ⚠️ Supabase 는 pgcrypto(crypt/gen_salt)를 `extensions` 스키마에 둔다 → search_path 에 반드시 포함.
 create or replace function auth_nickname(p_nickname text, p_password text)
-returns uuid language plpgsql security definer set search_path = public as $$
+returns uuid language plpgsql security definer set search_path = public, extensions as $$
 declare uid uuid; ph text;
 begin
   select id, password_hash into uid, ph from app_users where lower(nickname) = lower(p_nickname);
