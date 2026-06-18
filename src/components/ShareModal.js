@@ -34,7 +34,7 @@ export const ShareModal = ({ visible, onClose, defaultTitle = '내 포트폴리�
   const [nickname, setNickname] = useState('');
   const [password, setPassword] = useState('');
   const [eula, setEula] = useState(false);
-  const [isPublic, setIsPublic] = useState(false);
+  const [isPublic, setIsPublic] = useState(true); // 기본값: 공개 + 순위 등재
   const [step, setStep] = useState('form'); // 'form' | 'done'
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -48,7 +48,7 @@ export const ShareModal = ({ visible, onClose, defaultTitle = '내 포트폴리�
       setNickname(savedNickname ?? '');
       setPassword('');
       setEula(false);
-      setIsPublic(false);
+      setIsPublic(true);
       setStep('form');
       setLoading(false);
       setError(null);
