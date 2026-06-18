@@ -16,6 +16,7 @@ import { browsePublic } from '@/services/shareApi';
 import { getBlockedAuthors } from '@/utils/localModeration';
 import { SharedDetailModal } from '@/components/SharedDetailModal';
 import { MySharesModal } from '@/components/MySharesModal';
+import { ViewSharedModal } from '@/components/ViewSharedModal';
 
 const TOP_N = 5; // 요구사항 ①: 상위 5개
 const PAGE = 10; // 요구사항 ④: 더보기 10개씩
@@ -30,6 +31,7 @@ export const BrowseScreen = () => {
   const [hasMore, setHasMore] = useState(false);
   const [selected, setSelected] = useState(null);
   const [manageVisible, setManageVisible] = useState(false);
+  const [codeVisible, setCodeVisible] = useState(false);
 
   const offsetRef = useRef(0); // 서버에서 가져온 raw 개수(차단 필터 전)
   const blockedRef = useRef(new Set());
@@ -113,9 +115,14 @@ export const BrowseScreen = () => {
       <View style={styles.headerWrap}>
         <View style={styles.titleRow}>
           <Text style={styles.title}>둘러보기</Text>
-          <Pressable onPress={() => setManageVisible(true)} hitSlop={8}>
-            <Text style={styles.manageLink}>내 공유물</Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable onPress={() => setCodeVisible(true)} hitSlop={8}>
+              <Text style={styles.manageLink}>코드로 보기</Text>
+            </Pressable>
+            <Pressable onPress={() => setManageVisible(true)} hitSlop={8}>
+              <Text style={styles.manageLink}>내 공유물</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* 검색 모드 토글 */}
@@ -202,6 +209,8 @@ export const BrowseScreen = () => {
           fetchPage(true, activeQuery, mode); // 수정/삭제 반영 위해 목록 새로고침
         }}
       />
+
+      <ViewSharedModal visible={codeVisible} onClose={() => setCodeVisible(false)} />
     </SafeAreaView>
   );
 };
@@ -210,6 +219,7 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.bg },
   headerWrap: { padding: spacing.lg, gap: spacing.sm },
   titleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  headerActions: { flexDirection: 'row', gap: spacing.md },
   title: { color: colors.text, fontSize: 20, fontWeight: '700' },
   manageLink: { color: colors.primary, fontSize: 14, fontWeight: '600' },
 

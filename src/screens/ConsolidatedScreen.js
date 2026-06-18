@@ -10,7 +10,6 @@ import { DonutChart } from '@/components/DonutChart';
 import { ExportButtons } from '@/components/ExportButtons';
 import { BACKTEST_MODES, BacktestModal } from '@/components/BacktestModal';
 import { ShareModal } from '@/components/ShareModal';
-import { ViewSharedModal } from '@/components/ViewSharedModal';
 import { buildConsolidatedExport } from '@/utils/exportData';
 import {
   buildConsolidatedWeights,
@@ -26,9 +25,8 @@ export const ConsolidatedScreen = () => {
   const [viewMode, setViewMode] = useState(screenshotConsolidatedViewMode()); // 'symbol' | 'group'
   const [expandedGroups, setExpandedGroups] = useState(screenshotConsolidatedExpanded());
 
-  // 공유 (v3.0)
+  // 공유 (v3.0) — 내 포트폴리오 공유만. 남의 공유 열람은 "둘러보기" 탭.
   const [shareVisible, setShareVisible] = useState(false);
-  const [viewVisible, setViewVisible] = useState(false);
 
   const { totalBase, holdings } = useMemo(
     () => aggregateAcrossAccounts(state.accounts, base, usdToKrw),
@@ -153,23 +151,17 @@ export const ConsolidatedScreen = () => {
           </Pressable>
         )}
 
-        {/* 공유 (v3.0) */}
-        <View style={styles.shareRow}>
-          {holdings.length > 0 && (
+        {/* 포트폴리오 공유 (내 포트폴리오) */}
+        {holdings.length > 0 && (
+          <View style={styles.shareRow}>
             <Pressable
               style={[styles.shareBtn, styles.sharePrimary]}
               onPress={() => setShareVisible(true)}
             >
               <Text style={styles.sharePrimaryText}>포트폴리오 공유</Text>
             </Pressable>
-          )}
-          <Pressable
-            style={[styles.shareBtn, styles.shareSecondary]}
-            onPress={() => setViewVisible(true)}
-          >
-            <Text style={styles.shareSecondaryText}>공유 코드로 보기</Text>
-          </Pressable>
-        </View>
+          </View>
+        )}
 
         {/* 그룹별 범례 (그룹 모드일 때) */}
         {viewMode === 'group' && groups.length > 0 && (
@@ -295,7 +287,6 @@ export const ConsolidatedScreen = () => {
         baseCurrency={base}
         holdings={holdings}
       />
-      <ViewSharedModal visible={viewVisible} onClose={() => setViewVisible(false)} />
     </SafeAreaView>
   );
 };
