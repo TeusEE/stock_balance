@@ -26,7 +26,7 @@
 |---|---|---|
 | 1 | **익명 로그인 전용** → 앱 삭제/재설치 시 user id 소실 → 공유물·순위 영구 상실. "내 순위/내 공유"가 핵심인 기능에 치명적. | **Supabase Auth 미사용 — 별명+비밀번호를 우리 테이블(`app_users`)에 직접 저장**(bcrypt 해시). 읽기는 로그인 불필요, 쓰기는 RPC가 별명+비번 검증. 같은 별명+비번으로 어느 기기서나 소유권 증명 → 영속. **메일·OTP·GoTrue 없음.** (§3,§4) |
 | 2 | **첫 서버 전송 릴리스에 공개 피드 + 순위판 + UGC를 한 번에** 올림 → App Store 1.2(UGC) 심사 리스크가 가장 큰 기능을 처음부터 전부 노출. | **2단계 출시로 분리.** v3.0 = 공유(링크/비공개) + 읽기전용 뷰어, v3.1 = 공개 피드 + 순위판. 첫 서버 릴리스의 심사 표면을 줄인다. (§1) |
-| 3 | **순위판 수익률을 클라이언트가 제출** → 누구나 `return_6m`을 위조해 1위 가능. "조작 방지는 향후 과제"로 미룸 → 순위판이 무의미해질 위험. | **✅ 확정: 순위판 수익률은 오직 서버(Edge Function)에서만 계산·기록.** 클라이언트 제출 경로 없음 — `holdings`만 보내고 서버가 Yahoo 시세로 재계산. (§6, §8) |
+| 3 | 순위판 수익률 신뢰 문제(클라 제출은 위조 가능). | **MVP(2026-06-18 결정): 기존 `backtest.js`를 재활용해 클라가 계산·제출**(별도 계산 안 만듦). 위조 가능성은 취미용 순위판이라 감수. **차기 강화**: 같은 로직을 Edge 로 옮겨 서버 재계산. (§6) |
 
 **유지한 좋은 결정 (그대로 계승)**
 - 공유는 **비중(%)만** — 금액·보유수량·현재가는 서버로 보내지 않음.
@@ -164,7 +164,7 @@ create table shared_portfolios (
   share_token uuid not null default gen_random_uuid(),   -- unlisted 링크 공유용 비밀 토큰
   base_currency text not null default 'KRW',
   holdings jsonb not null,            -- [{name, symbol, category, targetPercent}] — 금액/수량/현재가 없음
-  return_6m numeric,                  -- ⚠️ 서버(Edge Function·service_role)만 기록
+  return_6m numeric,                  -- 소유자 인증 RPC submit_return(§6-A)로 기록. MVP=클라 계산값(위조 가능)
   return_computed_at timestamptz,
   on_leaderboard boolean not null default false,
   is_hidden boolean not null default false,   -- 신고 누적/모더레이션 시 숨김
@@ -252,14 +252,15 @@ begin
 end; $$;
 grant execute on function report_shared(uuid, text) to anon, authenticated;
 
--- return_6m / on_leaderboard 은 어떤 클라 입력 RPC에서도 받지 않음 → Edge Function(service_role)만 기록(§6).
+-- return_6m / on_leaderboard 은 소유자 인증 RPC `submit_return`(§6-A, v3.1)으로 기록.
+-- MVP 는 클라가 backtest.js 로 계산한 값을 신뢰(위조 가능) — 차기 Edge 재계산으로 강화(§6).
 ```
 
 **설계 메모**
 - `holdings`는 **비중·종목 메타만**. 직렬화 단계(§5)에서 금액/수량/현재가 제거를 강제.
 - **비밀번호는 `app_users.password_hash`에 bcrypt로만** 저장·비교(평문 금지, 클라로 해시 미노출). `app_users` 직접 접근은 RLS로 차단, 표시명은 `public_profiles` 뷰로만 노출.
 - 모든 쓰기는 `security definer` RPC가 별명+비번을 검증한 뒤 수행 → anon이 남의 글을 못 건드림.
-- `return_6m`/`on_leaderboard`은 **Edge Function(service_role)만** 기록 → 순위 조작 차단(클라 입력 RPC에 해당 칸 없음 + anon 직접 UPDATE는 RLS 차단).
+- `return_6m`/`on_leaderboard`은 소유자 인증 후 `submit_return` RPC(§6-A)로 기록(anon 직접 UPDATE는 RLS 차단). MVP는 클라 계산값 신뢰(위조 가능) — 차기 Edge 재계산으로 강화.
 - `is_hidden` + `reports` + `blocks`(app_users.id 기준) 로 1.2(UGC) 충족. 신고 임계치 누적 시 `is_hidden=true`(MVP: 수동/임계치, 차기: 자동).
 - 순위판 쿼리: `... where visibility='public' and on_leaderboard and not is_hidden order by return_6m desc limit N`. 차단 필터는 클라가 `blocks`와 대조하거나 RPC에서 처리.
 
@@ -287,24 +288,28 @@ export function toSharePayload({ title, baseCurrency, holdings }) {
 
 ---
 
-## 6. 순위판 수익률 — 서버(Edge) 재계산 (✅ 확정, 2026-06-18)
+## 6. 순위판 수익률 — 클라이언트 계산 + 제출 (MVP, 2026-06-18 변경)
 
-**결정**: 순위판 수익률은 **오직 Edge Function(서버)에서만 계산·기록**한다.
-클라이언트가 제출하는 수익률은 사용자가 언제든 위조해 1위를 만들 수 있어 순위판이 무의미해지므로,
-**클라이언트 제출 경로는 두지 않는다.** 클라이언트는 `holdings`만 보내고, 수익률은 서버가 시세로 재계산한다.
+**결정 (변경)**: 순위판 수익률은 **기존 `src/utils/backtest.js`(클라이언트)로 계산**해 제출한다.
+v2 백테스트 로직을 **그대로 재활용**(새 계산 없음). 별명+비밀번호로 소유자 인증 후
+`submit_return` RPC(§6-A)로 `return_6m`/`on_leaderboard`/`visibility='public'` 을 기록한다.
 
 ```
-[클라] "자랑하기" → shareApi.submitToLeaderboard(portfolioId, 별명, 비번)
-        → Edge Function `recompute-return` 호출 (별명+비번 동봉, JWT 없음)
-[서버] auth_nickname 으로 소유자 확인 → holdings 읽기 → Yahoo chart(6mo)로 v2 백테스트 재계산
-        → service_role 로 return_6m / return_computed_at / on_leaderboard=true UPDATE
-[클라] 순위판 새로고침 → 검증된 수익률로 정렬 노출
+[클라] "공개로 자랑하기"
+   → buildConsolidatedWeights + fetchHistoricalCloses('6mo') + simulate  (backtest.js, 재활용)
+   → return_6m 계산
+   → shareApi.submitReturn(별명, 비번, id, return_6m)
+[서버] auth_nickname 으로 소유자 확인
+   → return_6m / return_computed_at / on_leaderboard=true / visibility='public' UPDATE
 ```
 
-- Edge Function은 **v2 백테스트 로직을 서버에서 재현**(`src/utils/backtest.js`의 순수 계산을 Deno로 포팅 또는 공유).
-- 소유권은 **별명+비밀번호(`auth_nickname`)로 확인**(GoTrue JWT 미사용). 클라이언트는 `return_6m`을 직접 쓰지 못함(§4 RLS + service_role 전용) → 단일 진실원 = 서버.
-- 비용/레이트리밋: 자랑하기 호출 빈도 제한(예: 포트폴리오당 N시간 1회) + 결과 캐시(`return_computed_at`).
-- **v3.0에서는 순위판이 없으므로 이 함수도 불필요** — v3.1에서 도입.
+- **별도 계산을 새로 짜지 않는다** — 화면의 6개월 백테스트와 동일한 `backtest.js` 함수를 호출.
+- 소유권은 **별명+비밀번호(`auth_nickname`)로 확인**. anon 직접 UPDATE 는 RLS 로 차단.
+- **⚠️ MVP 한계: 수익률 위조 가능**(클라 제출값을 신뢰). 돈이 오가지 않는 취미용 순위판이라 감수하고,
+  악용이 보이면 강화한다.
+- **차기 강화(선택)**: **같은 `backtest.js` 로직을 Edge Function(Deno)에 올려 서버가 재계산** → 위조 차단.
+  로직은 그대로 재활용, 실행 위치만 서버로 이동(클라 제출 → 서버 기록).
+- **v3.0에는 순위판이 없으므로 불필요** — v3.1에서 도입.
 
 ---
 
@@ -371,23 +376,39 @@ grant execute on function browse_public(text, text, text, int, int) to anon, aut
 
 -- (스케일 시) 종목 '심볼 정확 일치' 검색 가속용 — 종목명 부분검색엔 무효
 create index if not exists shared_portfolios_holdings_gin on shared_portfolios using gin (holdings);
+
+-- 공개 등재 + 수익률 제출 (소유자 인증 후). MVP: 클라가 backtest.js 로 계산한 값을 저장(§6).
+create or replace function submit_return(p_nickname text, p_password text, p_id uuid, p_return numeric)
+returns void language plpgsql security definer set search_path = public as $$
+declare uid uuid;
+begin
+  uid := auth_nickname(p_nickname, p_password);
+  update shared_portfolios
+     set return_6m = p_return,
+         return_computed_at = now(),
+         on_leaderboard = true,
+         visibility = 'public'
+   where id = p_id and user_id = uid;
+end; $$;
+grant execute on function submit_return(text, text, uuid, numeric) to anon, authenticated;
 ```
 
 ### 공개 가시성 + 수익률 계산 연계 (선결)
 - `BrowseScreen` 에 뜨려면 포트폴리오가 **`visibility='public'`** 이어야 한다 → `ShareModal` 에
   "**공개로 자랑하기**" 옵션 추가(기존 `unlisted` 코드 공유와 별개 선택지).
 - 요구사항 ①(수익률 Top 5)이 의미를 가지려면 공개 글에 **`return_6m` 이 있어야** 한다 →
-  공개 게시/자랑하기 시 **Edge Function `recompute-return`(§6) 호출로 서버가 계산**해 채운다.
-  (아직 계산 전인 공개 글은 `return_6m=null` 로 순위 뒤로 밀리고 최신순에 노출.)
+  "공개로 자랑하기" 시 **클라가 기존 `backtest.js`로 6개월 수익률을 계산**(화면 백테스트와 동일 함수)해
+  `submit_return` RPC 로 제출한다(§6). 계산 실패/스킵 시 `return_6m=null` → 순위 뒤로, 최신순 노출.
 
 ### 신규/변경 코드 (v3.1)
 | 파일 | 역할 |
 |---|---|
 | `src/screens/BrowseScreen.js` (신규) | 둘러보기 탭: 검색바 + Top5 + 결과 리스트 + 더보기 |
-| `src/services/shareApi.js` (확장) | `browsePublic({ sort, nickname, symbol, limit, offset })` RPC 래퍼 |
-| `src/components/ShareModal.js` (확장) | "공개로 자랑하기" 옵션(+ 게시 후 `recompute-return` 호출) |
+| `src/services/shareApi.js` (확장) | `browsePublic({ sort, nickname, symbol, limit, offset })` + `submitReturn({ nickname, password, id, return6m })` RPC 래퍼 |
+| `src/components/ShareModal.js` (확장) | "공개로 자랑하기" 옵션 → `backtest.js`로 수익률 계산 후 `submitReturn` 제출 |
 | `src/navigation/AppNavigator.js` (확장) | 하단 탭에 **"둘러보기"** 추가 |
-| `supabase/functions/recompute-return/` (신규) | 공개 게시 시 6개월 수익률 서버 계산(§6) |
+| `submit_return` / `browse_public` RPC | §6-A SQL (v3.1 마이그레이션으로 실행) |
+| `supabase/functions/recompute-return/` | **차기(선택)** — 위조 차단용 서버 재계산. 같은 `backtest.js` 로직 포팅(§6) |
 
 ---
 
@@ -422,7 +443,7 @@ v3부터 수집 신고:
 
 ## 8. 보안 / 무결성
 - **RLS 검증** ✅(스모크): anon 의 `app_users` 직접 접근 차단, 공개 글만 SELECT. 쓰기는 별명+비번 검증 RPC로만.
-- **순위 무결성**: 수익률은 Edge Function(service_role)만 기록(§6). 클라 입력 RPC에 `return_6m`/`on_leaderboard` 칸 없음 → 위조 불가.
+- **순위 무결성(MVP 한계)**: 수익률은 소유자 인증 RPC(`submit_return`)로 **클라 계산값을 저장 → 위조 가능**. 취미용이라 감수, 악용 시 Edge 재계산으로 강화(§6). anon 직접 UPDATE는 RLS 차단.
 - **링크 공유 비밀성**: `unlisted`는 토큰 RPC로만 단건 조회, 공개 목록 쿼리엔 안 잡힘.
 - **남용 방지**: 가입/RPC rate limit(**미설정 — 선결 작업 §2**), (v3.1) 자랑하기 호출 빈도 제한.
 - **service_role 키**: Edge Function 환경변수에만. 클라이언트 유입 금지(코드리뷰 체크).
@@ -447,8 +468,9 @@ v3부터 수집 신고:
 | `scripts/check-supabase.js` | v3.0 | ✅ | 라이브 스모크(등록/게시/토큰조회/비번오류/RLS/정리) |
 | `src/screens/BrowseScreen.js` | v3.1 | ⬜ | "둘러보기" 탭: Top5 순위 + 별명/종목 검색 + 더보기(§6-A) |
 | `browse_public` RPC + `shareApi.browsePublic` | v3.1 | ⬜ | 공개 목록 조회(순위/검색/페이지네이션, §6-A) |
-| `ShareModal` "공개로 자랑하기" 옵션 | v3.1 | ⬜ | 공개 게시 + `recompute-return` 호출(§6-A) |
-| `supabase/functions/recompute-return/` | v3.1 | ⬜ | 공개 게시 시 6개월 수익률 서버 계산(§6) |
+| `submit_return` RPC + `shareApi.submitReturn` | v3.1 | ⬜ | 클라 계산 수익률 제출 + 공개 등재(§6, §6-A) |
+| `ShareModal` "공개로 자랑하기" 옵션 | v3.1 | ⬜ | `backtest.js`로 수익률 계산 → `submitReturn` 제출(§6-A) |
+| `supabase/functions/recompute-return/` | 차기 | ⬜ | (선택) 위조 차단용 서버 재계산 — 같은 backtest 로직 포팅(§6) |
 
 > 메모: v3.0 은 공유 진입을 별도 탭/스택 대신 **통합 화면의 버튼 + 모달**(`ShareModal`/`ViewSharedModal`)로 구현했다.
 > v3.1 은 하단 탭에 **"둘러보기"** 1개를 추가하고, 항목 탭 시 `SharedViewer` 로 읽기전용 표시(별도 상세 화면/스택 불필요).
@@ -471,7 +493,7 @@ v3부터 수집 신고:
 - [x] `npm test`: `shareSerialize`가 금액/수량/현재가를 **절대 포함하지 않음**(핵심), `shareApi` 페이로드 형태(supabase mock). + `nickname`. **전체 65개 통과.**
 - [x] 라이브 스모크(`node scripts/check-supabase.js`): `auth_nickname`(등록/검증/틀린비번 거부), `publish`/`get_shared_by_token`, `public_profiles`(해시 미노출), **`app_users` 직접 SELECT 차단(RLS)**, 정리 — 9개 통과.
 - [x] `return_6m`/`on_leaderboard` 위조 방지: 클라 입력 RPC에 해당 컬럼 없음 + anon 직접 UPDATE는 RLS 차단(트리거 불필요).
-- [ ] (v3.1) Edge Function: 위조한 `return_6m` 제출해도 서버 재계산값으로 덮어쓰는지.
+- [ ] (v3.1) `submit_return`: 소유자만 `return_6m`/`on_leaderboard`/`public` 설정, 타인 id 거부. (차기) Edge 재계산 시 클라 위조값 덮어쓰기 검증.
 - [ ] (v3.1) `browse_public`: ① 수익률 desc Top5 정렬(널 뒤), ② 별명 부분검색, ③ 종목명/티커 검색, ④ limit/offset 페이지네이션, `share_token` 미반환 검증.
 - [ ] 실기기: 별명+비밀번호 등록 → 공유 → 다른 기기에서 같은 별명+비밀번호로 내 공유물 관리(영속성).
 - [ ] 둘러보기(v3.1): 로그인 없이 Top5/검색/더보기 조회, 차단한 작성자 제외.
@@ -490,8 +512,8 @@ v3부터 수집 신고:
 7. [ ] (선결) RPC 레이트리밋 설정(비번 추측·신고 남용 방지, §2).
 
 **v3.1 ("둘러보기" 탭, 1.3.0)**
-6. `ShareModal` "공개로 자랑하기" 옵션(`visibility='public'`) + `recompute-return` Edge Function(§6)으로 `return_6m` 계산.
-7. `browse_public` RPC + GIN 인덱스(§6-A) + `shareApi.browsePublic` 래퍼.
+6. `ShareModal` "공개로 자랑하기" → 기존 `backtest.js`로 `return_6m` 계산 → `submit_return` RPC 제출(`visibility='public'`, `on_leaderboard=true`).
+7. `browse_public` + `submit_return` RPC + GIN 인덱스(§6-A) + `shareApi.browsePublic`/`submitReturn` 래퍼.
 8. `BrowseScreen`: ① Top5 순위 · ② 별명 검색 · ③ 종목 검색 · ④ 더보기(+10) · 로컬 차단 필터. 하단 탭 "둘러보기" 추가.
 9. 모더레이션 임계치 조정 + 심사 문서(공개 피드 반영) 갱신 → 1.3.0 제출.
 
@@ -502,7 +524,8 @@ v3부터 수집 신고:
 - **비밀번호 분실 시 복구 불가**(이메일 미수집) — 등록 화면 경고로 완화. 차기: 선택적 이메일/소셜 연동 복구
   (소셜 추가 시 Apple 4.8 — Sign in with Apple 동반 고려). 현재는 이메일/소셜이 없어 4.8 트리거 안 됨.
 - 별명이 로그인/소유권 키 → 흔한 별명은 선점되어 있을 수 있음(랜덤 추천 + 가용성 확인으로 완화).
-- 서버 재계산은 Yahoo 시세 의존(레이트리밋·결측 시 등재 보류). 배당·환차익·거래비용 미반영(v2 모델 승계, 6개월 고정).
+- 수익률 계산(클라 `backtest.js`)은 Yahoo 시세 의존(레이트리밋·결측 시 등재 보류). 배당·환차익·거래비용 미반영(v2 모델 승계, 6개월 고정).
+- 순위 수익률은 클라 제출이라 **위조 가능**(MVP 감수) → 차기 Edge 재계산으로 강화(§6).
 - 모더레이션 MVP는 수동 검토 + 임계치 자동숨김. 신고량 증가 시 자동화(Edge Function) 필요.
 - `unlisted` 토큰이 유출되면 해당 링크는 누구나 열람(설계상 "링크를 아는 사람" 공유).
 - 익명 신고는 악용(특정 글 깎아내리기) 가능 → 자동 숨김은 신고 3건 임계치 + **운영자 수동 검토**로 보완. 임계치 조정·신고자 식별은 신고량 보며 강화.
