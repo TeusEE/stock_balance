@@ -1,10 +1,23 @@
 # iOS 배포 진행 상황
 
-> 마지막 업데이트: 2026-06-04
+> 마지막 업데이트: 2026-06-18
 > 브랜치: `claude/stock-portfolio-rebalancing-app-LDvJ3`
 > 관련 문서: [`docs/ios-deploy.md`](docs/ios-deploy.md) · [`docs/screenshots.md`](docs/screenshots.md)
 
-App Store 배포 작업의 단계별 진행 상황을 기록합니다. 내일 이어서 할 때 여기부터 보세요.
+App Store 배포 작업의 단계별 진행 상황을 기록합니다.
+
+---
+
+## 🚀 현재 상태 (2026-06-18)
+
+- **v1.0.0 — App Store 출시 완료** (첫 심사 통과). Guideline 2.1·2.3·2.3.6 리젝션은 모두 해결됨.
+- **v1.1.0 — App Store 배포 완료**. v2.0(보유 백테스트)·v2.1(N일 리밸런싱 백테스트)까지 포함하고,
+  실기기 테스트에서 발견한 UX/버그(한글·ETF 검색, 키보드 닫기, 백테스트 캐시, 모달 닫기, 한글명 표시)를
+  수정한 버전. 자세한 변경은 [`CHANGELOG.md`](CHANGELOG.md).
+  - v2.2(환차익 FX)는 **취소**되어 미포함 — [`docs/roadmap.md`](docs/roadmap.md) 참조.
+- **다음 단계**: v3는 방향을 재검토(리비전) 중. 상세 계획은 [`docs/v3-implementation-plan.md`](docs/v3-implementation-plan.md).
+
+아래는 v1 첫 배포 당시의 단계별 기록(히스토리)입니다.
 
 ---
 

@@ -1,39 +1,51 @@
-# v3 상세 구현 계획 — 공유 대시보드 + 순위판 (Supabase)
+# v3 상세 구현 계획 (리비전) — 공유 대시보드 + 순위판 (Supabase)
 
 > 상태: **설계 / 구현 대기**
-> 작성: 2026-06-09 · 상위 문서: [`v2-v3-implementation-plan.md`](v2-v3-implementation-plan.md) (v3 섹션) · [`roadmap.md`](roadmap.md)
-> 이 문서는 상위 문서의 v3 섹션을 **검토·확장**한 실행용 상세 계획이다.
+> 작성: 2026-06-09 · **리비전: 2026-06-18**
+> 상위 문서: [`roadmap.md`](roadmap.md) · 출시 현황: [`../progress.md`](../progress.md)
+> 선행 조건: **1.1.0 App Store 배포 완료**(v2.0/v2.1 백테스트 포함). v3는 별도 버전으로 진행.
+
+이 문서는 기존 v3 계획을 **방향은 유지(공유 + 순위판)하되 약점을 보완**해 다시 쓴 실행용 계획이다.
+이전 버전(`v2-v3-implementation-plan.md`의 v3 섹션)은 폐기되었다.
 
 ---
 
-## 0. 기존 계획 검토 (무엇이 충분하고, 무엇이 빠졌나)
+## 0. 무엇을 리비전했나 (이전 계획 대비 변경점)
 
-**충분한 부분 (상위 문서가 이미 잘 잡음)**
-- 아키텍처: `profiles` / `shared_portfolios` 2테이블, 비중만 공유, 익명 로그인+닉네임.
-- 신규 파일·재사용 목록, 네비게이션(공유 탭), 화면 흐름, 구현 순서.
-- 핵심 프라이버시 원칙: 금액/보유수량/현재가는 **서버로 안 보냄**.
+이전 v3 계획은 RLS·UGC·App Privacy까지 잡았지만, 출시·운영을 막을 **3가지 구조적 약점**이 있었다.
+이번 리비전은 그 3가지를 정면으로 고친다.
 
-**빠져 있어 이 문서에서 보강하는 갭 (중요도 순)**
-1. **App Store UGC 심사(Guideline 1.2)** — 닉네임·공유 포트폴리오·순위판은 **사용자 생성 콘텐츠(UGC)**. Apple은 UGC 앱에 **신고/차단/모더레이션/EULA**를 요구한다. 기존 계획에 전혀 없음. → §7
-2. **App Privacy 설문 전환** — v1·v2는 "Data Not Collected"였으나 v3는 **수집 시작**. 어떤 카테고리를 어떻게 신고할지 명시 필요. → §7
-3. **RN에서 Supabase 세션/스토리지 설정** — `AsyncStorage` 어댑터, `react-native-url-polyfill/auto`, `detectSessionInUrl:false`, AppState 토큰 갱신. 누락 시 세션 유지·익명 로그인이 깨짐. → §3
-4. **정확한 RLS 정책문(SQL)** — 상위 문서는 "정책은 추후 작성"으로 비어 있음. → §4
-5. **익명 계정 데이터 소실 주의** — 앱 삭제/재설치 시 익명 user id가 사라져 공유물 접근 불가. UX·문서 처리 필요. → §3
-6. **'unlisted'(링크 공유)의 RLS 한계** — blanket SELECT 로는 비밀 보장이 안 됨. MVP 범위 조정. → §4
-7. **키 관리 구체화**(app.json extra vs EAS env)와 **출시 버전 분리**(1.1.0 심사와 격리). → §2, §9
+| # | 이전 계획의 문제 | 리비전 방향 |
+|---|---|---|
+| 1 | **익명 로그인 전용** → 앱 삭제/재설치 시 user id 소실 → 공유물·순위 영구 상실. "내 순위/내 공유"가 핵심인 기능에 치명적. | **Supabase Auth 미사용 — 별명+비밀번호를 우리 테이블(`app_users`)에 직접 저장**(bcrypt 해시). 읽기는 로그인 불필요, 쓰기는 RPC가 별명+비번 검증. 같은 별명+비번으로 어느 기기서나 소유권 증명 → 영속. **메일·OTP·GoTrue 없음.** (§3,§4) |
+| 2 | **첫 서버 전송 릴리스에 공개 피드 + 순위판 + UGC를 한 번에** 올림 → App Store 1.2(UGC) 심사 리스크가 가장 큰 기능을 처음부터 전부 노출. | **2단계 출시로 분리.** v3.0 = 공유(링크/비공개) + 읽기전용 뷰어, v3.1 = 공개 피드 + 순위판. 첫 서버 릴리스의 심사 표면을 줄인다. (§1) |
+| 3 | **순위판 수익률을 클라이언트가 제출** → 누구나 `return_6m`을 위조해 1위 가능. "조작 방지는 향후 과제"로 미룸 → 순위판이 무의미해질 위험. | **✅ 확정: 순위판 수익률은 오직 서버(Edge Function)에서만 계산·기록.** 클라이언트 제출 경로 없음 — `holdings`만 보내고 서버가 Yahoo 시세로 재계산. (§6, §8) |
+
+**유지한 좋은 결정 (그대로 계승)**
+- 공유는 **비중(%)만** — 금액·보유수량·현재가는 서버로 보내지 않음.
+- RLS로 "본인 것만 쓰기, 공개분만 읽기" 강제.
+- RN 전용 Supabase 세션 설정(AsyncStorage 어댑터, `react-native-url-polyfill`, `detectSessionInUrl:false`).
+- UGC 1.2 대응(신고/차단/모더레이션/EULA)·App Privacy 설문 전환.
 
 ---
 
-## 1. 범위 (MVP)
+## 1. 범위 & 2단계 출시
 
-**포함**: 익명 로그인+닉네임 / 포트폴리오 공개(비중만) / 공개 목록 탐색 / 읽기전용 뷰어 /
-순위판(6개월 수익률 내림차순) / "자랑하기" 제출 / **신고·차단·EULA(1.2 대응)**.
+### v3.0 — 공유 + 읽기전용 뷰어 (첫 서버 전송 릴리스, 예: 1.2.0)
+**포함**: 이메일 OTP 인증 + 닉네임 / 포트폴리오 공유(비중만, `private`·`unlisted`(링크) ) /
+링크로 받은 공유물 **읽기전용 뷰어** / 신고·차단·EULA(1.2 기본 대응) / 처리방침·App Privacy 갱신.
+**핵심**: 공개 "탐색 피드"와 순위판은 **아직 없음** → 무한 노출되는 UGC 표면이 작아 첫 심사 리스크 최소화.
 
-**제외(차기)**: 소셜 로그인, 'unlisted' 링크 공유, 서버 측 수익률 재계산(Edge Function),
-팔로우/댓글, 환차익 반영(취소됨).
+### v3.1 — 공개 피드 + 순위판 (예: 1.3.0)
+**포함**: 공개(`public`) 가시성 / 공개 탐색 피드 / **순위판(서버 재계산 수익률 내림차순)** /
+"포트폴리오 자랑하기" / 강화된 모더레이션(자동 숨김 임계치, 비속어 필터).
 
-**범위 조정**: `visibility` 는 MVP 에서 **`public` / `private` 두 값만**. `unlisted` 는 안전한
-링크 공유(`share_token` + RPC)가 필요하므로 차기로 미룬다(§4 참고).
+### 제외(차기)
+소셜 로그인(추가 시 Apple 4.8 고려), 팔로우/댓글/좋아요, 환차익 반영(취소됨), 다기간 백테스트.
+
+> **범위 메모**: `unlisted`(링크 공유)는 v3.0부터 지원하되 **`share_token` + `security definer` RPC**로
+> 안전하게 구현한다(blanket SELECT 금지 — §4). 이전 계획이 "MVP에서 unlisted 제외"로 미뤘던 부분을,
+> 토큰 방식으로 v3.0에 정식 포함한다.
 
 ---
 
@@ -41,26 +53,34 @@
 
 ### Supabase (계정 보유자 직접)
 - [ ] 프로젝트 생성 → **Project URL**, **anon public key** 확보 (Settings → API)
-- [ ] Authentication → Providers → **Anonymous sign-in 활성화**
-- [ ] SQL Editor에 §4 스키마 + RLS 실행
-- [ ] (선택) Auth → Rate limits 확인 (익명 가입 남용 방지)
+- [ ] **Supabase Auth 사용 안 함** — Provider 설정 불필요. 별명+비밀번호는 앱 테이블(`app_users`)로 자체 관리(§3,§4)
+- [ ] 둘러보기는 로그인 불필요(anon 키 + RLS 공개 읽기)
+- [ ] SQL Editor에서 §4 스키마 + `pgcrypto` 확장 + RLS + RPC 실행
+- [ ] (보안) RPC 호출 레이트리밋으로 비밀번호 무차별 추측 방지
+- [ ] (v3.1) Edge Functions 활성화 — 순위판 재계산 함수 배포(§6)
+- [ ] Auth → Rate limits 확인 (가입/OTP 남용 방지)
 
 ### 클라이언트 의존성
 - [ ] `@supabase/supabase-js`, `react-native-url-polyfill`, `@react-native-async-storage/async-storage`(이미 있음)
 
 ### 키 관리
-- anon 키는 공개돼도 **RLS로 보호**되므로 `app.json`의 `expo.extra.supabaseUrl/supabaseAnonKey`에 둔다.
-- 빌드 환경 분리를 위해 `eas.json`의 `build.production.env`로도 주입 가능. `expo-constants`의
-  `Constants.expoConfig.extra`로 런타임 로드.
-- service_role 키는 **절대 클라이언트에 넣지 않는다.**
+- anon 키는 공개돼도 **RLS로 보호** → `app.json`의 `expo.extra.supabaseUrl/supabaseAnonKey`.
+  빌드 분리를 위해 `eas.json`의 `build.*.env`로도 주입, `Constants.expoConfig.extra`로 런타임 로드.
+- **service_role 키는 절대 클라이언트에 넣지 않는다.** Edge Function 내부에서만 사용.
 
 ### 출시 분리 ⚠️
-- v3는 **서버 전송이 시작**되므로 현재 심사 중인 **1.1.0에 포함하지 않는다.**
-- v3는 별도 버전(예: **1.2.0**)으로, 1.1.0 통과 후 진행. 처리방침·App Privacy 갱신과 함께 제출.
+- v3는 **서버 전송이 시작**되므로 1.1.0과 격리. v3.0=1.2.0, v3.1=1.3.0 (1.2.0 통과 후) 권장.
+- 1.2.0 제출 시 처리방침·App Privacy 갱신 동반(§7).
 
 ---
 
-## 3. 인증 (익명 + 닉네임)
+## 3. 인증 — 별명 + 비밀번호 (Supabase Auth 미사용·자체 저장, ✅ 확정 2026-06-18)
+
+### 설계 원칙 — 최소 시퀀스
+- **읽기(둘러보기·순위판 조회)**: **로그인 불필요.** anon 키 + RLS 공개 읽기만으로 동작(세션 없음).
+- **쓰기(공유/자랑하기)**: 최초 1회 **별명 + 비밀번호** 등록만. **이메일·OTP·메일 수신 단계 없음.**
+- **등록 순서**: ① 별명(랜덤 추천 or 직접 입력 + 중복 확인) → ② 비밀번호 → 끝.
+- 같은 별명+비밀번호로 **어느 기기에서나 로그인** → 재설치·기기 변경에도 내 공유물/순위 유지.
 
 ### Supabase 클라이언트 (`src/services/supabase.js`)
 RN 전용 설정이 핵심 — 빠지면 세션이 유지되지 않는다.
@@ -80,37 +100,62 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 ```
-- AppState 변화 시 `supabase.auth.startAutoRefresh()/stopAutoRefresh()` 연결(포그라운드 토큰 갱신).
-- `ensureSession()`: 세션 없으면 `signInAnonymously()` 호출 후 `profiles` 행 보장(닉네임).
+- GoTrue 세션을 쓰지 않으므로 위 `auth` 옵션은 사실상 무관 — 클라이언트는 **anon 키로 RPC/SELECT 호출**에만 사용.
 
-### AuthContext (`src/context/AuthContext.js`)
-- 앱 시작 시 세션 복원 → 없으면 lazy 익명 로그인은 **공유 시점**까지 미룬다(불필요한 익명 계정 양산 방지).
-- 상태: `{ session, nickname, ensureSignedIn(), setNickname() }`. `App.js`에서 트리 래핑.
+### Supabase Auth 미사용 — 별명·비밀번호를 우리 테이블에 직접 저장
+GoTrue(Supabase Auth)를 쓰지 않는다. 별명·비밀번호는 **우리 DB(`app_users`)에 저장되는 데이터**이고,
+모든 클라이언트는 **anon 키**로만 접근한다. 쓰기는 전부 `security definer` RPC가 별명+비밀번호를 검증한 뒤 수행한다.
+- **🔒 비밀번호는 반드시 해시**: pgcrypto bcrypt(`crypt(pw, gen_salt('bf'))`). **평문 저장 금지.**
+  검증도 DB 함수 내부에서만(`hash = crypt(pw, hash)`) — 해시는 클라이언트로 **절대 안 내려감**.
+- 세션/JWT 없음: 클라이언트는 쓰기 때마다 별명+비밀번호를 HTTPS로 RPC에 전달(필요 시 기기 안전저장소에 캐시).
+- 별명 유일성은 `app_users`의 `lower(nickname)` 유니크 인덱스로 보장(§4) → 사칭/중복 방지.
 
-### ⚠️ 익명 계정 데이터 소실 (문서화·UX)
-- 익명 user id는 기기/세션 로컬. **앱 삭제·재설치 시 복구 불가** → 공유물 소유권 상실.
-- MVP: 닉네임 입력 모달에 "이 기기에서만 관리됩니다" 안내. 차기: 이메일 연동(`linkIdentity`)으로 복구 제공.
+### 별명 생성 (`src/utils/nickname.js`)
+- `suggestNickname()` — 형용사+명사+숫자 조합(예: "든든한코끼리42") 랜덤 추천으로 충돌 최소화.
+- `normalizeNickname(nickname)` — 비교용 정규화(소문자, 공백·특수문자 정리).
+- 직접 입력 시 `checkNicknameAvailable`로 가용성 확인.
+
+### 등록/검증 흐름 & AuthContext (`src/context/AuthContext.js`)
+- 최초 공유 시 `auth_nickname(별명, 비번)` RPC(§4):
+  - 별명 없음 → **신규 등록**(해시 저장) 후 user_id 반환
+  - 별명 있음 → 비번 일치 시 user_id 반환, 틀리면 거부(=별명 선점/비번 오류)
+- 이후 수정·삭제·자랑하기: 같은 별명+비밀번호를 RPC에 동봉해 소유권 증명.
+- 상태: `{ nickname, credentials, register(nickname,password), verify(nickname,password), checkNicknameAvailable(nickname) }`.
+  `App.js`에서 `AuthProvider`로 트리 래핑.
+
+### 데이터 영속성 / 한계 / 책임
+- 별명+비밀번호는 **기기 독립** → 재설치·기기 변경에도 복구 가능(이전 "익명 전용"의 소실 문제 해결).
+- ⚠️ **자체 관리 비용**: 비번 해시 보관·비교 정확성, 무차별 추측 방지(RPC 레이트리밋/시도 제한)는 **우리 책임**.
+  (동일 UX를 Supabase Auth로 하면 GoTrue가 대신 처리 — 본 플랜은 'Auth 미사용·자체 저장' 방침을 택함.)
+- ⚠️ **비밀번호 분실 시 복구 불가**(이메일 미수집). 등록 화면에 "재설정 불가, 꼭 기억하세요" 안내. 차기 복구 옵션.
 
 ---
 
-## 4. 데이터 모델 + RLS (정확한 SQL)
+## 4. 데이터 모델 + RLS + 링크공유 RPC (정확한 SQL)
 
 ```sql
--- profiles: 익명 유저 닉네임 (닉네임은 순위판/뷰어에 노출되는 공개 표시명)
-create table profiles (
-  id uuid primary key references auth.users on delete cascade,
+create extension if not exists pgcrypto;   -- bcrypt 해시용
+
+-- app_users: 별명 + 비밀번호 해시 (Supabase Auth 미사용 — 앱 자체 관리)
+create table app_users (
+  id uuid primary key default gen_random_uuid(),
   nickname text not null check (char_length(nickname) between 1 and 20),
+  password_hash text not null,           -- ⚠️ bcrypt 해시만. 평문 저장 금지.
   created_at timestamptz default now()
 );
+-- 별명 유일성(대소문자 무시) — 로그인/소유권 키
+create unique index app_users_nickname_lower on app_users (lower(nickname));
 
 create table shared_portfolios (
   id uuid primary key default gen_random_uuid(),
-  owner uuid not null references auth.users on delete cascade,
+  user_id uuid not null references app_users on delete cascade,
   title text not null check (char_length(title) between 1 and 40),
-  visibility text not null default 'public' check (visibility in ('public','private')),
+  visibility text not null default 'private'
+    check (visibility in ('private','unlisted','public')),
+  share_token uuid not null default gen_random_uuid(),   -- unlisted 링크 공유용 비밀 토큰
   base_currency text not null default 'KRW',
   holdings jsonb not null,            -- [{name, symbol, category, targetPercent}] — 금액/수량/현재가 없음
-  return_6m numeric,
+  return_6m numeric,                  -- ⚠️ 서버(Edge Function·service_role)만 기록
   return_computed_at timestamptz,
   on_leaderboard boolean not null default false,
   is_hidden boolean not null default false,   -- 신고 누적/모더레이션 시 숨김
@@ -119,54 +164,80 @@ create table shared_portfolios (
 );
 create index on shared_portfolios (visibility, on_leaderboard, return_6m desc);
 
--- 신고 (UGC 1.2 대응)
+-- 신고 / 차단 (UGC 1.2) — app_users.id 기준이라 '사용자 차단'이 가능
 create table reports (
   id uuid primary key default gen_random_uuid(),
-  reporter uuid not null references auth.users on delete cascade,
+  reporter uuid not null references app_users on delete cascade,
   portfolio_id uuid not null references shared_portfolios on delete cascade,
   reason text,
   created_at timestamptz default now(),
   unique (reporter, portfolio_id)             -- 1인 1신고
 );
-
--- 차단 (UGC 1.2 대응): 내가 차단한 소유자
 create table blocks (
-  blocker uuid not null references auth.users on delete cascade,
-  blocked uuid not null references auth.users on delete cascade,
+  blocker uuid not null references app_users on delete cascade,
+  blocked uuid not null references app_users on delete cascade,
   created_at timestamptz default now(),
   primary key (blocker, blocked)
 );
 
-alter table profiles          enable row level security;
+-- RLS: anon은 '공개 글 읽기'만. 모든 쓰기는 아래 security definer RPC로만(별명+비밀번호 검증).
+alter table app_users         enable row level security;   -- 정책 없음 → anon 직접 접근 차단(해시 보호)
 alter table shared_portfolios enable row level security;
-alter table reports           enable row level security;
-alter table blocks            enable row level security;
+alter table reports           enable row level security;   -- 정책 없음 → RPC로만
+alter table blocks            enable row level security;   -- 정책 없음 → RPC로만
 
--- profiles: 닉네임은 공개 읽기, 본인만 생성/수정
-create policy profiles_read   on profiles for select using (true);
-create policy profiles_insert on profiles for insert with check (id = auth.uid());
-create policy profiles_update on profiles for update using (id = auth.uid());
+-- 공개 글만 읽기 허용(숨김 제외). 비공개/unlisted는 토큰 RPC로만(아래).
+create policy sp_public_read on shared_portfolios for select
+  using (visibility = 'public' and not is_hidden);
 
--- shared_portfolios
-create policy sp_read on shared_portfolios for select
-  using ((visibility = 'public' and not is_hidden) or owner = auth.uid());
-create policy sp_insert on shared_portfolios for insert with check (owner = auth.uid());
-create policy sp_update on shared_portfolios for update using (owner = auth.uid()) with check (owner = auth.uid());
-create policy sp_delete on shared_portfolios for delete using (owner = auth.uid());
+-- 공개 표시명 뷰 — password_hash 절대 노출 안 함(클라 조인용)
+create view public_profiles as select id, nickname from app_users;
 
--- reports / blocks: 본인 것만
-create policy reports_insert on reports for insert with check (reporter = auth.uid());
-create policy blocks_all on blocks for all using (blocker = auth.uid()) with check (blocker = auth.uid());
+-- 별명+비밀번호 검증/등록 → user_id 반환 (해시 비교는 DB 내부에서만)
+create or replace function auth_nickname(p_nickname text, p_password text)
+returns uuid language plpgsql security definer set search_path = public as $$
+declare uid uuid; ph text;
+begin
+  select id, password_hash into uid, ph from app_users where lower(nickname) = lower(p_nickname);
+  if uid is null then                       -- 신규 등록
+    insert into app_users(nickname, password_hash)
+      values (p_nickname, crypt(p_password, gen_salt('bf'))) returning id into uid;
+    return uid;
+  end if;
+  if ph = crypt(p_password, ph) then return uid; end if;   -- 기존: 비번 일치
+  raise exception 'invalid_credentials';                   -- 별명 선점 or 비번 오류
+end; $$;
+
+-- 게시: 별명+비번 검증 후 INSERT (수정/삭제/신고/차단도 동일하게 검증 RPC로)
+create or replace function publish_portfolio(
+  p_nickname text, p_password text,
+  p_title text, p_base text, p_holdings jsonb, p_visibility text default 'private'
+) returns shared_portfolios language plpgsql security definer set search_path = public as $$
+declare uid uuid; row shared_portfolios;
+begin
+  uid := auth_nickname(p_nickname, p_password);
+  insert into shared_portfolios(user_id, title, base_currency, holdings, visibility)
+    values (uid, p_title, p_base, p_holdings, coalesce(p_visibility,'private'))
+    returning * into row;
+  return row;
+end; $$;
+
+-- unlisted 링크 공유: 토큰 아는 사람만 1건 조회(공개목록엔 안 잡힘)
+create or replace function get_shared_by_token(p_token uuid)
+returns setof shared_portfolios language sql security definer set search_path = public as $$
+  select * from shared_portfolios where share_token = p_token and not is_hidden;
+$$;
+
+-- return_6m / on_leaderboard 은 어떤 클라 입력 RPC에서도 받지 않음 → Edge Function(service_role)만 기록(§6).
 ```
 
 **설계 메모**
-- `holdings` 는 **비중·종목 메타만**. 직렬화 단계(§5)에서 금액/수량/현재가 제거를 강제.
-- `is_hidden` + `reports` + `blocks` 로 1.2(UGC) 요구를 충족. 신고 임계치 누적 시 `is_hidden=true`
-  (MVP: 수동/간단 트리거. 차기: Edge Function 자동화).
-- **'unlisted' 미지원 이유**: blanket SELECT 정책으로는 uuid를 아는 사람만 보게 보장하기 어렵고
-  공개 목록 쿼리와 분리도 애매하다. 차기 `share_token uuid` + `security definer` RPC 로 구현.
-- 순위판 쿼리: `select ... join profiles ... where visibility='public' and on_leaderboard and not is_hidden order by return_6m desc limit N`.
-  (차단 필터는 클라이언트에서 `blocks` 와 대조하거나 RPC에서 처리.)
+- `holdings`는 **비중·종목 메타만**. 직렬화 단계(§5)에서 금액/수량/현재가 제거를 강제.
+- **비밀번호는 `app_users.password_hash`에 bcrypt로만** 저장·비교(평문 금지, 클라로 해시 미노출). `app_users` 직접 접근은 RLS로 차단, 표시명은 `public_profiles` 뷰로만 노출.
+- 모든 쓰기는 `security definer` RPC가 별명+비번을 검증한 뒤 수행 → anon이 남의 글을 못 건드림.
+- `return_6m`/`on_leaderboard`은 **Edge Function(service_role)만** 기록 → 순위 조작 차단(클라 입력 RPC에 해당 칸 없음 + anon 직접 UPDATE는 RLS 차단).
+- `is_hidden` + `reports` + `blocks`(app_users.id 기준) 로 1.2(UGC) 충족. 신고 임계치 누적 시 `is_hidden=true`(MVP: 수동/임계치, 차기: 자동).
+- 순위판 쿼리: `... where visibility='public' and on_leaderboard and not is_hidden order by return_6m desc limit N`. 차단 필터는 클라가 `blocks`와 대조하거나 RPC에서 처리.
 
 ---
 
@@ -188,89 +259,133 @@ export function toSharePayload({ title, baseCurrency, holdings }) {
 }
 ```
 - 입력은 `aggregateAcrossAccounts`/`aggregateByCategory`(`src/utils/aggregate.js`) 결과 또는 단일 계좌.
-- **단위 테스트(필수)**: 출력 객체에 `totalAmount`/`ownedShares`/`currentPrice` 키가 **절대 없음**을 단언.
+- **단위 테스트(필수)**: 출력에 `totalAmount`/`ownedShares`/`currentPrice` 키가 **절대 없음**을 단언.
 
 ---
 
-## 6. 신규 코드 / 재사용 / 네비게이션
+## 6. 순위판 수익률 — 서버(Edge) 재계산 (✅ 확정, 2026-06-18)
 
-### 신규 파일
-| 파일 | 역할 |
-|---|---|
-| `src/services/supabase.js` | 클라이언트 싱글톤(§3), `ensureSession()` |
-| `src/services/shareApi.js` | `publishPortfolio` / `updateShared` / `unpublish` / `listPublic` / `getShared` / `submitToLeaderboard` / `listLeaderboard` / `report` / `block` |
-| `src/utils/shareSerialize.js` | 비중만 추출(§5) |
-| `src/context/AuthContext.js` | 익명 세션 + 닉네임 |
-| `src/screens/ShareDashboardScreen.js` | 공개 목록 탐색 |
-| `src/screens/SharedDetailScreen.js` | 읽기전용 뷰어 + **신고/차단** 버튼 |
-| `src/screens/LeaderboardScreen.js` | 수익률 내림차순 순위판 |
-| `src/components/NicknameModal.js` | 최초 공유 시 닉네임 입력 + EULA 동의 |
+**결정**: 순위판 수익률은 **오직 Edge Function(서버)에서만 계산·기록**한다.
+클라이언트가 제출하는 수익률은 사용자가 언제든 위조해 1위를 만들 수 있어 순위판이 무의미해지므로,
+**클라이언트 제출 경로는 두지 않는다.** 클라이언트는 `holdings`만 보내고, 수익률은 서버가 시세로 재계산한다.
 
-### 재사용
-- `src/utils/aggregate.js`(`aggregateAcrossAccounts`/`aggregateByCategory`) — 뷰어 비중 분포.
-- `src/components/DonutChart.js` — 뷰어 차트.
-- `src/screens/ConsolidatedScreen.js` — 렌더 로직을 **읽기전용 공용 컴포넌트로 추출**해 뷰어와 공유.
-- `src/utils/backtest.js` — "자랑하기" `return_6m` 계산 재사용.
-- `src/components/ExportButtons.js` — "공유하기" 버튼 추가 위치 참고.
+```
+[클라] "자랑하기" → shareApi.submitToLeaderboard(portfolioId, 별명, 비번)
+        → Edge Function `recompute-return` 호출 (별명+비번 동봉, JWT 없음)
+[서버] auth_nickname 으로 소유자 확인 → holdings 읽기 → Yahoo chart(6mo)로 v2 백테스트 재계산
+        → service_role 로 return_6m / return_computed_at / on_leaderboard=true UPDATE
+[클라] 순위판 새로고침 → 검증된 수익률로 정렬 노출
+```
 
-### 네비게이션
-- `src/navigation/AppNavigator.js`: 하단 탭에 **"공유"** 추가 → 내부 stack:
-  `ShareDashboard → SharedDetail → Leaderboard`.
-- `App.js`: `AuthProvider` 래핑.
+- Edge Function은 **v2 백테스트 로직을 서버에서 재현**(`src/utils/backtest.js`의 순수 계산을 Deno로 포팅 또는 공유).
+- 소유권은 **별명+비밀번호(`auth_nickname`)로 확인**(GoTrue JWT 미사용). 클라이언트는 `return_6m`을 직접 쓰지 못함(§4 RLS + service_role 전용) → 단일 진실원 = 서버.
+- 비용/레이트리밋: 자랑하기 호출 빈도 제한(예: 포트폴리오당 N시간 1회) + 결과 캐시(`return_computed_at`).
+- **v3.0에서는 순위판이 없으므로 이 함수도 불필요** — v3.1에서 도입.
 
 ---
 
-## 7. App Store 컴플라이언스 (필수 — 기존 계획 누락분)
+## 7. App Store 컴플라이언스 (필수)
 
-### 7-1. UGC — Guideline 1.2 (반드시 충족)
-닉네임·공유 포트폴리오·순위판은 사용자 생성 콘텐츠다. Apple 요구사항:
+### 7-1. UGC — Guideline 1.2
+닉네임·공유 포트폴리오·(v3.1)순위판은 사용자 생성 콘텐츠다.
 - [ ] **EULA 동의** — 최초 공유 전 "불쾌한 콘텐츠 무관용" 약관 동의(NicknameModal 내 체크).
-- [ ] **신고(report)** — 모든 공유 항목/순위판 항목에 "신고" 버튼(`reports` INSERT).
+- [ ] **신고(report)** — 모든 공유/순위 항목에 "신고" 버튼(`reports` INSERT).
 - [ ] **차단(block)** — 특정 사용자 콘텐츠 숨기기(`blocks`).
-- [ ] **모더레이션** — 신고된 콘텐츠 24시간 내 조치(MVP: `is_hidden` 수동/임계치). 운영 연락처(이미 `xodn1311@gmail.com`).
-- [ ] **콘텐츠 필터** — 닉네임/제목 비속어 1차 필터(간단 금지어 목록).
+- [ ] **모더레이션** — 신고 콘텐츠 **24시간 내 조치**(MVP: 신고 임계치 → `is_hidden`, 운영자 수동 검토). 연락처 `xodn1311@gmail.com`.
+- [ ] **콘텐츠 필터** — 닉네임/제목 비속어 1차 필터(금지어 목록).
+
+> 2단계 출시 덕분에 v3.0은 공개 피드/순위판이 없어 노출 표면이 작다. 단, **링크 공유물도 UGC**이므로
+> 신고/차단/EULA는 v3.0부터 갖춘다.
 
 ### 7-2. App Privacy 설문 (Data Not Collected → 수집 신고)
-v3부터 다음을 수집한다고 신고:
-- **Identifiers → User ID**: 익명 user id (Linked, 추적 아님).
-- **User Content → Other User Content**: 닉네임, 공유 포트폴리오(종목+비중), 제목.
-- 용도: App Functionality. **추적(Tracking) 아님.** 광고/분석 SDK 없음 유지.
+v3부터 수집 신고:
+- **Identifiers → User ID**: user id (Linked, 추적 아님).
+- **User Content → Other User Content**: 별명, 공유 포트폴리오(종목+비중), 제목.
+- **이메일 미수집** — 별명+비밀번호 인증이라 Contact Info(이메일) 수집 신고 불필요. (합성 이메일은 내부 식별자일 뿐 사용자 메일 아님)
+- 비밀번호는 **우리 DB에 bcrypt 해시**로 저장하는 인증 자격증명(평문 아님, 추적/광고 용도 아님).
+- 용도: App Functionality / Account Management. **추적(Tracking) 아님.** 광고/분석 SDK 없음 유지.
 
 ### 7-3. 처리방침 / 심사 Notes 갱신
-- `docs/privacy-policy.md`: "서버로 전송되는 데이터" 섹션 추가 — 닉네임·공유 비중·익명 id·수익률,
-  전송 대상 Supabase, 사용자가 삭제(unpublish) 가능, 금액/수량/현재가는 **전송 안 함** 명시.
-- `docs/app-review-notes.md`: 외부 서비스에 **Supabase** 추가(인증=익명, RLS 보호), UGC 신고/차단 흐름 설명.
+- `docs/privacy-policy.md`: "서버로 전송되는 데이터" 섹션 — 별명·공유 비중·user id·(v3.1)수익률,
+  대상 Supabase, 사용자 삭제(unpublish/계정삭제) 가능, **이메일 미수집**, **금액/수량/현재가는 전송 안 함** 명시.
+- `docs/app-review-notes.md`: 외부 서비스에 **Supabase** 추가(인증=별명+비밀번호, 이메일 없음, RLS 보호), UGC 신고/차단 흐름.
 - 호스트 추가: `*.supabase.co`.
 
 ---
 
 ## 8. 보안 / 무결성
-- **RLS 검증**: SQL 에디터에서 타 user 의 row UPDATE/DELETE/INSERT(owner 위조) 거부 확인.
-- **수익률 조작 가능성**: `return_6m` 은 클라이언트 제출 → **조작 가능**. MVP 한계로 문서화하고,
-  차기 **Edge Function 서버 재계산**으로 대체(순위판 신뢰성).
-- **익명 가입 남용**: 공유 시점까지 익명 로그인 지연 + Supabase rate limit.
-- service_role 키 클라이언트 유입 금지(코드리뷰 체크).
+- **RLS 검증**: 타 user row의 UPDATE/DELETE/INSERT(owner 위조) 거부, `return_6m`/`on_leaderboard` 클라 변경 거부(트리거).
+- **순위 무결성**: 수익률은 Edge Function(service_role)만 기록(§6). 클라이언트 제출값 신뢰 안 함.
+- **링크 공유 비밀성**: `unlisted`는 토큰 RPC로만 단건 조회, 공개 목록 쿼리엔 안 잡힘.
+- **남용 방지**: OTP/가입 rate limit, 자랑하기 호출 빈도 제한.
+- **service_role 키**: Edge Function 환경변수에만. 클라이언트 유입 금지(코드리뷰 체크).
 
 ---
 
-## 9. 테스트 / 검증
-- `npm test`: `shareSerialize` 가 금액/수량/현재가를 **절대 포함하지 않음** 단위 테스트(핵심).
-- `shareApi` 는 supabase 클라이언트 mock 으로 페이로드 형태/필수 필드 검증.
-- 실기기(`npx expo start`): 공유 → Supabase 대시보드 row 확인 → 다른 기기 공유 탭 노출.
-- RLS: 타인 row 변조 거부, `is_hidden`/`private` 가 목록에서 빠지는지.
-- 자랑하기 → 순위판 닉네임+수익률 내림차순. 신고/차단 동작.
+## 9. 신규 코드 / 재사용 / 네비게이션
 
-## 10. 구현 순서 (권장)
-1. **기반**: deps 추가, `supabase.js`(§3), `AuthContext`, `app.json extra`. 익명 로그인+`profiles` 생성까지.
-2. **직렬화+게시**: `shareSerialize`(+테스트), `shareApi.publish/update/unpublish`, "공유하기" 버튼+`NicknameModal`(EULA).
-3. **탐색+뷰어**: `ShareDashboardScreen`, 읽기전용 뷰어(`ConsolidatedScreen` 렌더 추출), `getShared`.
-4. **순위판+자랑하기**: `submitToLeaderboard`(backtest 재사용), `LeaderboardScreen`.
-5. **UGC 컴플라이언스**: 신고/차단/`is_hidden`/EULA/비속어 필터(§7-1).
-6. **심사 문서**: 처리방침·App Privacy·Notes 갱신(§7-2,3).
-7. **출시**: 버전 1.2.0, 1.1.0 통과 후 빌드·제출.
+### 신규 파일
+| 파일 | 단계 | 역할 |
+|---|---|---|
+| `src/services/supabase.js` | v3.0 | anon 클라이언트 싱글톤(§3) — RPC/SELECT용, GoTrue 세션 미사용 |
+| `src/services/shareApi.js` | v3.0 | RPC 래퍼(별명+비번 동봉): `publishPortfolio`/`updateShared`/`unpublish`/`getByToken`/`report`/`block` (+v3.1 `submitToLeaderboard`/`listPublic`/`listLeaderboard`) |
+| `src/utils/shareSerialize.js` | v3.0 | 비중만 추출(§5) |
+| `src/context/AuthContext.js` | v3.0 | 별명+비밀번호 등록/검증(RPC), 자격 보관 |
+| `src/utils/nickname.js` | v3.0 | 랜덤 별명 추천 + 별명 정규화(§3) |
+| `src/components/NicknameModal.js` | v3.0 | 별명(랜덤/직접)+비밀번호 등록 + EULA 동의 |
+| `src/components/SharedViewer.js` | v3.0 | 읽기전용 뷰어(도넛+리스트). `ConsolidatedScreen` 렌더 추출 |
+| `src/screens/SharedDetailScreen.js` | v3.0 | 링크/토큰으로 받은 공유물 상세(뷰어 + 신고/차단) |
+| `src/screens/ShareDashboardScreen.js` | v3.1 | 공개 피드 탐색 |
+| `src/screens/LeaderboardScreen.js` | v3.1 | 수익률 내림차순 순위판 |
+| `supabase/functions/recompute-return/` | v3.1 | 순위판 수익률 서버 재계산(§6) |
 
-## 11. 리스크 / 한계 (문서화)
-- 익명 계정 데이터 소실(재설치). 차기 이메일 연동.
-- 클라이언트 제출 수익률 조작 가능. 차기 서버 재계산.
-- 환차익·배당 미반영(6개월 고정) — v2 모델 승계.
-- 'unlisted' 링크 공유 미지원(차기 `share_token`+RPC).
+### 재사용
+- `src/utils/aggregate.js`(`aggregateAcrossAccounts`/`aggregateByCategory`) — 뷰어 비중 분포.
+- `src/components/DonutChart.js` — 뷰어 차트.
+- `src/screens/ConsolidatedScreen.js` — 렌더 로직을 `SharedViewer`로 추출해 공용화.
+- `src/utils/backtest.js` — Edge Function 재계산 로직의 원본(서버 포팅).
+- `src/components/ExportButtons.js` — "공유하기" 버튼 추가 위치 참고.
+
+### 네비게이션
+- `src/navigation/AppNavigator.js`: (v3.1) 하단 탭 **"공유"** 추가 → stack: `ShareDashboard → SharedDetail → Leaderboard`.
+  v3.0에서는 탭 없이 계좌/통합 화면의 "공유하기" → 링크 생성 + `SharedDetail` 진입만.
+- `App.js`: `AuthProvider` 래핑.
+
+---
+
+## 10. 테스트 / 검증
+- `npm test`: `shareSerialize`가 금액/수량/현재가를 **절대 포함하지 않음**(핵심), `shareApi` 페이로드 형태(supabase mock).
+- RLS(SQL 에디터): 타인 row 변조 거부, `return_6m`/`on_leaderboard` 클라 변경 거부, `private`/`is_hidden`가 목록에서 빠짐.
+- 링크 공유: `get_shared_by_token` 정상 단건 조회, 토큰 없이는 비노출.
+- (v3.1) Edge Function: 위조한 `return_6m` 제출해도 서버 재계산값으로 덮어쓰는지.
+- `auth_nickname` RPC: 신규 별명=등록, 기존 별명+올바른 비번=통과, 틀린 비번=거부. 비번 해시가 클라로 안 나가는지.
+- 실기기: 별명+비밀번호 등록 → 공유 → 다른 기기에서 같은 별명+비밀번호 로그인 시 내 공유물 보임(영속성 확인).
+- 둘러보기: 로그인 없이 공개 피드/순위판 조회되는지(anon 키 + RLS 공개 읽기).
+
+---
+
+## 11. 구현 순서 (권장)
+
+**v3.0 (공유 + 뷰어 · 첫 서버 릴리스, 1.2.0)**
+1. deps + `supabase.js`(§3) + `nickname.js` + `AuthContext`(별명+비밀번호 RPC) + §4 스키마/RPC(pgcrypto) + `app.json extra`.
+2. `shareSerialize`(+테스트) + `shareApi`(publish/update/unpublish/getByToken) + `NicknameModal`(별명+비밀번호+EULA).
+3. `SharedViewer`(ConsolidatedScreen 렌더 추출) + `SharedDetailScreen` + "공유하기" 버튼.
+4. UGC 기본: 신고/차단/`is_hidden`/비속어 필터(§7-1).
+5. 심사 문서: 처리방침·App Privacy·Notes 갱신(§7) → 1.2.0 빌드·제출(1.1.0 통과 후).
+
+**v3.1 (공개 피드 + 순위판, 1.3.0)**
+6. `visibility='public'` 허용 + `ShareDashboardScreen`(공개 피드).
+7. `supabase/functions/recompute-return`(§6, v2 백테스트 서버 포팅) + `submitToLeaderboard`.
+8. `LeaderboardScreen`(서버 재계산 수익률 내림차순) + "자랑하기" 버튼.
+9. 모더레이션 강화(자동 숨김 임계치) + 심사 문서 갱신 → 1.3.0 제출.
+
+---
+
+## 12. 리스크 / 한계 (문서화)
+- **자체 비밀번호 관리 책임** — bcrypt 해시 + RPC 레이트리밋으로 추측/유출 방지(Supabase Auth 위임 대비 우리가 직접 책임).
+- **비밀번호 분실 시 복구 불가**(이메일 미수집) — 등록 화면 경고로 완화. 차기: 선택적 이메일/소셜 연동 복구
+  (소셜 추가 시 Apple 4.8 — Sign in with Apple 동반 고려). 현재는 이메일/소셜이 없어 4.8 트리거 안 됨.
+- 별명이 로그인/소유권 키 → 흔한 별명은 선점되어 있을 수 있음(랜덤 추천 + 가용성 확인으로 완화).
+- 서버 재계산은 Yahoo 시세 의존(레이트리밋·결측 시 등재 보류). 배당·환차익·거래비용 미반영(v2 모델 승계, 6개월 고정).
+- 모더레이션 MVP는 수동 검토 + 임계치 자동숨김. 신고량 증가 시 자동화(Edge Function) 필요.
+- `unlisted` 토큰이 유출되면 해당 링크는 누구나 열람(설계상 "링크를 아는 사람" 공유).

@@ -5,11 +5,11 @@
 
 ---
 
-## [Unreleased] — 1.0.1 빌드 예정
+## [1.1.0] — 2026-06-18 (App Store 배포 완료)
 
-> App Store 2.1(Information Needed) 재제출을 준비하며, 실기기 테스트에서 발견한
-> UX 문제와 백테스트 버그를 수정했습니다. 아래 항목은 모두 다음 iOS 빌드
-> (`eas build --platform ios --profile production --auto-submit`)에 포함됩니다.
+> v2.0(보유 6개월 백테스트)·v2.1(N일 주기 리밸런싱 백테스트)을 포함하고,
+> 실기기 테스트에서 발견한 UX 문제와 버그를 수정한 버전입니다. App Store 심사를
+> 통과해 배포 완료되었습니다. (v2.2 환차익 FX는 취소되어 미포함 — `docs/roadmap.md` 참조)
 
 ### 수정 (Fixed)
 - **한글 종목명 검색이 안 되던 문제** — `삼성전자` 등 한글 검색이 "결과 없음"으로

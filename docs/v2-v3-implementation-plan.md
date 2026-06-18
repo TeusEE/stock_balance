@@ -1,8 +1,9 @@
 # Stock Balance v2 / v3 구현 계획
 
-> 마지막 업데이트: 2026-06-03
+> 마지막 업데이트: 2026-06-18
 > 관련 문서: [`roadmap.md`](roadmap.md) · [`../progress.md`](../progress.md) · [`../README.md`](../README.md)
-> 상태: **계획 단계** (아직 구현 전)
+> 상태: **v2.0·v2.1 구현 완료 → 1.1.0 배포 완료.** v2.2(환차익)는 취소.
+> **이 문서의 v3 섹션은 폐기(superseded)** — v3는 리비전되어 [`v3-implementation-plan.md`](v3-implementation-plan.md)로 이전됨.
 
 ## 배경 (Context)
 
@@ -267,92 +268,14 @@ const result = computeBacktest(weighted, priceMap0, { baseCurrency: base, fxMap 
 
 ---
 
-## v3 — 공유 대시보드 + 순위판
+## v3 — 공유 대시보드 + 순위판 (⛔ 이 섹션 폐기 — 리비전됨)
 
-> v2의 백테스트 위에서 동작한다. **이 시점부터 서버(Supabase) 전송이 시작**되므로
-> 개인정보 처리방침·데이터 수집 설문 갱신이 선결 과제다.
-
-### 공통 선결 작업 (v3 진입 전 1회)
-
-- **Supabase 프로젝트 생성** (Postgres + Auth, MVP는 RLS만).
-- 의존성 추가: `@supabase/supabase-js`, `react-native-url-polyfill` (RN fetch/URL 폴리필).
-- **환경변수**: `app.json`의 `expo.extra`에 `supabaseUrl` / `supabaseAnonKey`.
-  anon 키는 공개 가능(RLS로 보호)하나, EAS 빌드에서 주입되도록 `eas.json` env로 관리.
-- **개인정보 처리방침 / App Store 데이터 수집 설문 갱신** — 서버 전송이 시작되므로 필수.
-  수집 항목: 닉네임, 공유 포트폴리오(종목+비중), 익명 user id, 백테스트 수익률.
-
-### 데이터 모델 (Supabase)
-
-```sql
--- profiles: 익명 유저의 닉네임
-create table profiles (
-  id uuid primary key references auth.users on delete cascade,
-  nickname text not null,
-  created_at timestamptz default now()
-);
-
--- shared_portfolios: 공유된 포트폴리오 (비중만, 금액 없음) + 순위판 수익률
-create table shared_portfolios (
-  id uuid primary key default gen_random_uuid(),
-  owner uuid not null references auth.users on delete cascade,
-  title text not null,
-  visibility text not null default 'public',   -- 'public' | 'unlisted' | 'private'
-  base_currency text not null default 'KRW',
-  holdings jsonb not null,   -- [{ name, symbol, category, targetPercent }]
-  return_6m numeric,                  -- v2가 계산한 6개월 백테스트 수익률(%) (클라이언트 제출)
-  return_computed_at timestamptz,
-  on_leaderboard boolean default false,
-  created_at timestamptz default now(),
-  updated_at timestamptz default now()
-);
-```
-
-- **RLS 정책**: 본인(`owner = auth.uid()`)만 INSERT/UPDATE/DELETE. SELECT는
-  `visibility = 'public'` 이거나 본인 것. `unlisted`는 id를 아는 경우만(링크 공유).
-- `holdings`는 **비중·종목 메타만** — `totalAmount`/`ownedShares`/`currentPrice` 제외.
-- 순위판 = `shared_portfolios where on_leaderboard and visibility='public' order by return_6m desc`.
-
-### 신규 코드
-
-| 파일 | 역할 |
-|---|---|
-| `src/services/supabase.js` | Supabase 클라이언트 싱글톤 (`createClient` + `extra` 키 로딩), 익명 로그인 보장 헬퍼 |
-| `src/services/shareApi.js` | `publishPortfolio()`, `updateShared()`, `unpublish()`, `listPublic()`, `getShared(id)`, `submitToLeaderboard()`, `listLeaderboard()` |
-| `src/utils/shareSerialize.js` | 로컬 계좌 → 공유 페이로드 변환 (**비중만 추출**). `buildConsolidatedExport`(`src/utils/exportData.js`) 형식 정신 재사용 |
-| `src/context/AuthContext.js` | 익명 세션 + 닉네임 상태. `App.js`에서 트리 래핑 |
-| `src/screens/ShareDashboardScreen.js` | 공개 포트폴리오 목록 탐색 |
-| `src/screens/SharedDetailScreen.js` | 단일 공유 포트폴리오 **읽기 전용 뷰어** |
-| `src/screens/LeaderboardScreen.js` | 수익률 내림차순 순위판 (닉네임 + 수익률 + 종목 미리보기) |
-| `src/components/NicknameModal.js` | 최초 공유 시 닉네임 입력 |
-
-### 재사용 (수정 최소화)
-
-- `src/utils/aggregate.js`의 `aggregateAcrossAccounts` / `aggregateByCategory` — 공유 뷰어 비중 분포.
-- `src/components/DonutChart.js` — 읽기 전용 뷰어 차트.
-- `src/screens/ConsolidatedScreen.js` — 렌더 로직을 **읽기 전용 공용 컴포넌트로 추출**해
-  본인 통합 뷰와 `SharedDetailScreen`이 공유 (선택: 처음엔 복제 후 통합).
-- `src/components/ExportButtons.js` — 옆에 "공유하기(게시)" 버튼 추가 패턴 참고.
-- `src/utils/backtest.js` (v2) — "포트폴리오 자랑하기" 시 `return_6m` 계산 재사용.
-
-### 네비게이션 변경
-
-- `src/navigation/AppNavigator.js`: 하단 탭에 **"공유"** 탭 추가. 공유 탭 내부는
-  `createNativeStackNavigator`로 목록(`ShareDashboardScreen`) → 상세(`SharedDetailScreen`) →
-  순위판(`LeaderboardScreen`) 스택 구성 (탭 과밀하면 공유 탭 상단 세그먼트).
-- `App.js`: `AuthProvider`로 트리 래핑.
-
-### 화면 흐름
-
-1. 계좌/통합 화면에서 **"공유하기"** → (최초 1회) 닉네임 입력 → 익명 로그인 →
-   비중만 추출해 `shared_portfolios`에 INSERT → 성공 토스트.
-2. **공유 탭** → 공개 목록 → 항목 탭 → 읽기 전용 뷰어(도넛 + 종목 리스트, 닉네임 표시).
-3. **"포트폴리오 자랑하기"** → v2 백테스트로 `return_6m` 계산 →
-   `return_6m`/`return_computed_at`/`on_leaderboard=true` UPDATE → 순위판 노출.
-
-### MVP의 알려진 한계 (문서화)
-
-- 클라이언트 제출 수익률은 **조작 가능** → 향후 Supabase Edge Function 서버 재계산으로 교체.
-- 환차익 미반영, 배당 미반영, 6개월 고정 기간(v2 모델 한계 그대로 승계).
+> **이 v3 계획은 폐기되었다.** 익명계정 데이터 소실, App Store UGC(1.2) 심사 부담,
+> 순위판 수익률 클라이언트 제출(조작 가능) 등의 약점을 보완해 방향(공유+순위판)은 유지하되
+> 다시 작성했다. **최신 v3 계획은 [`v3-implementation-plan.md`](v3-implementation-plan.md) 참조.**
+>
+> 주요 변경: ① 인증 = **별명+비밀번호 자체 저장**(Supabase Auth·이메일 미사용, bcrypt 해시), ② **2단계 출시**(v3.0 공유/뷰어 →
+> v3.1 공개피드/순위판)로 심사 표면 축소, ③ 순위판 수익률 **서버(Edge Function) 재계산**으로 조작 차단.
 
 ---
 
@@ -379,11 +302,7 @@ create table shared_portfolios (
 - 시뮬레이터: 통합 화면 헤더의 KRW/USD 토글을 바꾸면 백테스트 캐시가 무효화되고 결과가 바뀌는지,
   모달 라벨에 "(KRW 기준)" / "(USD 기준)" 이 표시되는지 확인.
 
-**v3 (공유 + 순위판)**
-- `npm test` — `shareSerialize`가 금액/보유수량을 절대 포함하지 않음을 단위 테스트로 검증.
-- `npx expo start` 실기기: 공유하기 → Supabase 대시보드에서 row 확인 → 다른 기기에서 공유 탭 노출 확인.
-- Supabase SQL 에디터로 RLS 검증: 타인 row UPDATE 시도가 거부되는지 확인.
-- 자랑하기 → 순위판에 닉네임·수익률 내림차순 표시 확인.
+**v3 (공유 + 순위판)** — 리비전됨. 검증 방법은 [`v3-implementation-plan.md` §10](v3-implementation-plan.md) 참조.
 
 ---
 
@@ -408,8 +327,5 @@ create table shared_portfolios (
 11. ~~`ConsolidatedScreen.runBacktest` — base=헤더 토글값, base 변경 시 캐시 무효화 추가.~~
 12. ~~`BacktestModal` 라벨에 base 통화 표시, `no-fx-data` reason 라벨 추가.~~
 
-**v3 (이후, Supabase 도입)**
-13. 공통 선결: Supabase 프로젝트 + 의존성 + `supabase.js` + 익명 로그인 + 개인정보 설문 갱신.
-14. `shareSerialize`(테스트) → `shareApi` → `AuthContext`/닉네임 → 공유 탭/뷰어.
-15. 순위판: `submitToLeaderboard`/`listLeaderboard` → 자랑하기 버튼(v2 `backtest.js` 재사용) → `LeaderboardScreen`.
-16. `roadmap.md`의 v2/v3 항목을 "구현 중/완료"로 갱신.
+**v3 (이후, Supabase 도입)** — 리비전됨. 구현 순서는 [`v3-implementation-plan.md` §11](v3-implementation-plan.md) 참조
+(v3.0 공유/뷰어 → v3.1 공개피드/순위판 2단계).
