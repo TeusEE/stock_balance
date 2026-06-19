@@ -27,7 +27,10 @@ App Store 배포 작업의 단계별 진행 상황을 기록합니다.
   - ✅ 내 공유물 관리(`MySharesModal`, `list_mine`): 로그인 → 제목/공개범위 수정·삭제
   - ✅ 역할 정리: 통합 탭=내 포트폴리오 / 둘러보기 탭=소셜(순위·검색·코드로 보기·내 공유물)
   - ✅ 검증: 단위 68개 + 라이브 스모크 19개 통과
-  - ⬜ 남은 것: 실기기 테스트, RPC 레이트리밋(선택), 1.1.0 통과 후 심사 문서 게시 → 1.2.0/1.3.0 빌드
+- **v1.2.0 — 배포 준비 완료** (v3.0+v3.1 포함). `app.json` 버전 1.2.0, 스플래시 추가, web.favicon 제거.
+  - ✅ 처리방침(`privacy-policy.md`) 공유 전송 데이터 포함 버전으로 교체 → **GitHub Pages 게시 필요**
+  - ✅ 심사 노트(`app-review-notes.md`) v1.2.0 기준 갱신 + App Privacy 가이드(User ID/User Content 수집 신고)
+  - ⬜ 남은 것: App Store Connect App Privacy 설문 갱신 → `eas build --auto-submit` → 실기기 테스트
 
 아래는 v1 첫 배포 당시의 단계별 기록(히스토리)입니다.
 

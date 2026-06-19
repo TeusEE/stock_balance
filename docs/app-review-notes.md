@@ -1,74 +1,61 @@
-# App Review Information — Notes (paste-ready)
+# App Review Information — Notes (paste-ready, v1.2.0)
 
-이 파일은 App Store Connect 의
-**App Review Information → Notes** 필드에 붙여넣는 영문 원본입니다.
-아래 **코드블록 안의 내용만** 복사해서 Notes 칸에 넣으세요(한글 설명은 제외).
+이 파일은 App Store Connect 의 **App Review Information → Notes** 필드에 붙여넣는 영문 원본입니다.
+아래 **코드블록 안의 내용만** 복사해서 Notes 칸에 넣으세요(한글 설명 제외).
 
-> ⚠️ Notes 필드는 **4000자 제한**이 있습니다. 아래 본문은 약 **3,300자**라
-> 제한 안에 들어갑니다. 디바이스/URL 은 이미 채워져 있으니 그대로 복사하면 됩니다.
-
-기존 리젝션 사유: **Guideline 2.1 — Information Needed**.
-응답은 Apple 이 요청한 7개 항목을 같은 순서로 답합니다.
+> ⚠️ Notes 4000자 제한 — 아래 본문은 약 3,300자라 제한 안에 들어갑니다.
+> ⚠️ **v1.2.0 = 선택적 공유(서버 전송) 첫 도입.** 제출 전 ① 처리방침(`privacy-policy.md`, 공유 내용 포함)이 라이브인지,
+> ② App Privacy 설문을 아래 가이드대로 갱신했는지 확인하세요.
 
 ---
 
 ```
-ABOUT THIS REPLY
-No account/login, no in-app purchases, no ads, no user-generated content, and no permission prompts. Answers to the seven requested items, in order:
+ABOUT THIS BUILD (v1.2.0)
+This update adds an OPTIONAL portfolio-sharing feature. No in-app purchases, no ads, and no permission prompts (no camera/location/contacts/tracking/notifications). The core app still works fully offline with no account.
 
-1) SCREEN RECORDING
-A recording made on a physical iPhone (latest iOS) is attached. It shows: app launch; creating an account tab and entering a total amount; adding holdings via stock search ("삼성전자"/"VOO") and manual entry (cash); setting each target %; the donut chart, 100% validation, and recommended-shares card; the Consolidated tab with symbol/group toggle; the 6-month backtest result modal (hold/weekly/monthly/quarterly); and JSON export via the OS share sheet. There is no registration/login/account-deletion flow, no paid content, and no prompt for camera, location, contacts, tracking, or notifications.
+1) WHAT'S NEW IN 1.2.0
+An optional "Share Portfolio" feature lets a user publish ONLY their portfolio weights (security name, ticker, category, target %) so others can view them via a share code or in a public "Browse" tab with a 6-month-return ranking. Amounts, owned share counts, current prices, and total assets are NEVER sent.
 
-2) TESTED DEVICES & iOS VERSIONS
+2) ACCOUNTS / AUTH
+Browsing the app, viewing market data, and viewing shared portfolios require NO login. Only PUBLISHING requires a lightweight account = a self-chosen nickname + password. We do NOT collect email, phone, or any social login (passwords are bcrypt-hashed on our server; we do not use a hosted auth provider). The same nickname+password lets a user manage (edit/delete) their own shares from any device. No email means no reset email.
+
+3) USER-GENERATED CONTENT — MODERATION (Guideline 1.2)
+Shared portfolios and nicknames are user-generated content. We provide: an EULA / "no objectionable content" agreement required before first publish; a REPORT control on every shared item; a BLOCK-author action; a profanity filter on nickname/title; automatic hiding once a report threshold is reached, plus manual review. Moderation/abuse contact: xodn1311@gmail.com.
+
+4) TESTED DEVICES & iOS VERSIONS
 - iPhone 16, iOS 26.5
 
-3) APP PURPOSE & TARGET AUDIENCE
-Stock Balance is a personal portfolio tracking and rebalancing calculator for retail investors who hold stocks/ETFs across multiple brokerage accounts. It lets the user declare each account's total and holdings with target weights, fetch current prices from a public market-data endpoint, compute the whole-number shares to buy/sell to reach each target weight, view a consolidated allocation across accounts, and run a 6-month historical backtest. It is informational/analytical only: it gives no investment advice, executes no trades, holds no assets, processes no payments, and collects no user data. Primary locale: Korean.
+5) APP PURPOSE & TARGET AUDIENCE
+A personal portfolio tracking and rebalancing calculator for retail investors who hold stocks/ETFs across multiple brokerage accounts: declare each account's total and holdings with target weights, fetch current prices from public market data, compute whole-number shares to buy/sell to hit each target weight, view a consolidated allocation, run a 6-month historical backtest, and OPTIONALLY share weights. Informational/analytical only: no investment advice, no trade execution, no custody, no payments. Primary locale: Korean.
 
-4) SETUP & ACCESS — NO LOGIN REQUIRED
-All data is stored on-device via standard AsyncStorage. No account, login, or demo credentials. First use: launch -> "+ 탭 추가" (add account) -> enter name and total -> "+ 항목 추가" (add item) -> "검색" (search by ticker/name; price and currency auto-fill) or type a name manually -> enter target % (donut updates live; warns if total is not 100%) -> see recommended shares -> "Consolidated" tab merges all accounts (symbol/group views).
+6) EXTERNAL SERVICES
+- Naver stock search (https://m.stock.naver.com/front-api/search) — security search; sends only the search text.
+- Yahoo Finance chart (https://query1.finance.yahoo.com/v8/finance/chart/{symbol}) — price/currency and historical closes; sends only the ticker.
+- Supabase (https://zbjpvtrwdiuihuzkhkye.supabase.co) — backend for the OPTIONAL Share feature only; stores nickname, a bcrypt-hashed password, portfolio weights, a random user id, and a computed 6-month return. Protected by Row Level Security.
+No IAP, no ads, no analytics/attribution/crash SDK, no tracking.
 
-5) EXTERNAL SERVICES
-Two external services, both read-only and unauthenticated:
-- Naver stock search (https://m.stock.naver.com/front-api/search) — used only to search securities by name/ticker (sends only the search text).
-- Yahoo Finance chart (https://query1.finance.yahoo.com/v8/finance/chart/{symbol}) — current price/currency and historical daily closes for the backtest (sends only the chosen ticker).
-No auth services, API keys, payment processors, AI/ML, analytics, ad SDKs, crash reporters, or own backend. No personal or device data is sent.
+7) REGIONAL CONSISTENCY
+Behavior is identical in all regions; the UI is Korean. Yahoo Finance covers global markets via ticker suffixes (e.g., 005930.KS KOSPI, AAPL NASDAQ). Nothing is region-locked.
 
-6) REGIONAL CONSISTENCY
-Behavior is identical in all regions. The UI is Korean for this release, but all features work worldwide. Yahoo Finance covers global markets via ticker suffixes (e.g., "005930.KS" KOSPI, "AAPL" NASDAQ); nothing is region-locked and there are no country-specific gates.
-
-7) REGULATED INDUSTRY / THIRD-PARTY MATERIAL
-This is a personal-finance information and calculation tool. It holds no brokerage/custodial/fiduciary license, gives no individualized advice (only target-weight arithmetic and historical weighted-return reporting), executes no trades, and charges no fees. Market data comes from Yahoo Finance's public endpoint serving publicly available quotes. The app bundles no licensed third-party text/image/audio/video.
+8) REGULATED INDUSTRY / THIRD-PARTY MATERIAL
+A personal-finance information and calculation tool. No brokerage/custodial/fiduciary license, no individualized advice (only target-weight arithmetic and historical weighted-return reporting), no trade execution, no fees. Market data comes from public endpoints serving publicly available quotes. The app bundles no licensed third-party text/image/audio/video.
 
 Privacy policy: https://teusee.github.io/stock_balance/privacy-policy.html
-Support contact: xodn1311@gmail.com
+Support / moderation contact: xodn1311@gmail.com
 ```
 
 ---
 
-## 보조: App Privacy 설문 답변 가이드 (현재 1.1.0)
+## App Privacy 설문 갱신 (1.2.0 — Data Not Collected → 수집 신고)
 
-App Store Connect → App Privacy 에서 데이터 수집 항목을 묻습니다.
-**1.1.0(공유 기능 없음)** 까지는 모든 항목에 **"Data Not Collected"** 로 답할 수 있습니다.
-근거:
-- 권한 요청 0건 (`src/` 어디에도 `Permissions*` / `expo-camera`/`expo-location` 등 import 없음)
-- 외부 호스트는 Naver/Yahoo 뿐, 어떤 식별자도 전송 안 함
-- 모든 사용자 데이터는 AsyncStorage 로컬 저장
+> 1.1.0 까지는 모두 "Data Not Collected" 였지만, **1.2.0 부터 공유 기능으로 서버 전송이 시작**되므로 아래로 갱신.
 
----
-
-## (1.2.0 / v3.0 제출용 추가 메모 — 공유 기능 포함 시에만 적용)
-
-> ⚠️ 아래는 **공유 기능이 들어간 1.2.0** 제출 때 사용. 1.1.0 심사에는 사용하지 않음.
-> 처리방침은 `privacy-policy-v3.md` 를 라이브로 게시한 뒤 제출.
-
-**App Privacy 설문 변경 (Data Not Collected → 수집 신고)**
-- **Identifiers → User ID**: 익명 user id (Linked, 추적 아님)
+**수집 신고 항목** (모두 Linked, **추적 아님**, 용도 = App Functionality / Account Management):
+- **Identifiers → User ID**: 랜덤 user id
 - **User Content → Other User Content**: 별명, 공유 포트폴리오(종목+비중), 제목
-- 이메일/전화/위치/추적 식별자 **미수집** 유지. 광고·분석 SDK 없음.
-- 비밀번호는 우리 DB에 **bcrypt 해시**로 저장(인증 자격증명, 추적 아님).
 
-**Notes 에 추가할 문단 (영문)**
-```
-SHARING (v1.2.0): An optional "Share Portfolio" feature lets a user publish ONLY portfolio weights (security name, ticker, category, target %) to our backend (Supabase). Amounts, owned shares, current prices, and total assets are never sent. Auth uses a self-chosen nickname + password (bcrypt-hashed server-side; NO email/phone/social, no Supabase Auth). Browsing/market data still require no login. User-generated content (nicknames, shared portfolios) has in-app REPORT and BLOCK, an EULA acceptance before first publish, a profanity filter on nickname/title, and auto-hide after a report threshold plus manual review. Users can unpublish their shared items anytime. Added host: https://<project>.supabase.co.
-```
+**미수집 유지**: 이메일/전화/주소(Contact Info), 위치, 연락처, 카메라/사진, 추적용 식별자.
+- 비밀번호는 우리 DB에 **bcrypt 해시**로 저장하는 인증 자격증명(추적/광고 용도 아님).
+- 광고·분석·어트리뷰션·크래시 SDK 없음. **App Tracking Transparency 대상 아님.**
+
+**근거**: 공유는 사용자가 명시적으로 "포트폴리오 공유"를 누를 때만 전송. 금액/보유수량/현재가는 전송 안 함(비중만).
