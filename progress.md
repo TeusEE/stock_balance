@@ -15,14 +15,19 @@ App Store 배포 작업의 단계별 진행 상황을 기록합니다.
   실기기 테스트에서 발견한 UX/버그(한글·ETF 검색, 키보드 닫기, 백테스트 캐시, 모달 닫기, 한글명 표시)를
   수정한 버전. 자세한 변경은 [`CHANGELOG.md`](CHANGELOG.md).
   - v2.2(환차익 FX)는 **취소**되어 미포함 — [`docs/roadmap.md`](docs/roadmap.md) 참조.
-- **v3.0 구현 진행 중** (공유 + 읽기전용 뷰어). 상세 계획: [`docs/v3-implementation-plan.md`](docs/v3-implementation-plan.md).
-  - ✅ Supabase 프로젝트 + 스키마/RLS/RPC 적용, 라이브 스모크 테스트 9개 통과(`scripts/check-supabase.js`)
-  - ✅ 데이터 레이어: `supabase.js` / `shareApi.js`(RPC) / `AuthContext`(별명+비번, Auth 미사용)
-  - ✅ 순수 유틸 + 테스트: `shareSerialize`(민감정보 미전송) / `nickname` (전체 65 테스트 통과)
-  - ✅ UI: `ShareModal`(공유 흐름) / `SharedViewer`(읽기전용) / `ViewSharedModal`(코드로 보기 + 신고/차단), 통합 화면 연결
-  - ✅ UGC 1.2: 익명 신고(`report_shared`)+신고 3건 자동 숨김 / 비속어 필터(`moderation`) / 기기 로컬 차단(`localModeration`) / EULA (전체 68개 테스트 통과)
+- **v3.0 구현 완료** (공유 + 읽기전용 뷰어). 상세 계획: [`docs/v3-implementation-plan.md`](docs/v3-implementation-plan.md).
+  - ✅ Supabase 프로젝트 + 스키마/RLS/RPC 적용. 라이브 스모크 통과(`scripts/check-supabase.js`)
+  - ✅ 데이터 레이어: `supabase.js` / `shareApi.js`(RPC) / `AuthContext`(별명+비번, Supabase Auth 미사용)
+  - ✅ UI: `ShareModal`(공유) / `SharedViewer`(읽기전용) / `ViewSharedModal`(코드로 보기)
+  - ✅ UGC 1.2: 익명 신고(`report_shared`)+신고 3건 자동 숨김 / 비속어 필터 / 기기 로컬 차단 / EULA
   - ✅ 심사 문서 초안: `privacy-policy-v3.md` + `app-review-notes` 부록 (1.2.0 제출 시 라이브 게시)
-  - ⬜ 남은 것: **신고 마이그레이션 SQL 실행**(report_shared), RPC 레이트리밋, 실기기 테스트 → 1.2.0 빌드
+- **v3.1 구현 완료** ("둘러보기" 탭 + 내 공유물 관리).
+  - ✅ 둘러보기 탭(`BrowseScreen`): 수익률 Top5 / 별명 검색 / 종목 검색 / 더보기(+10) / 로컬 차단 필터
+  - ✅ 공개+순위 등재(`submit_return`): 게시 시 기존 `backtest.js`로 6개월 수익률 계산·제출. **공유 기본값=공개**
+  - ✅ 내 공유물 관리(`MySharesModal`, `list_mine`): 로그인 → 제목/공개범위 수정·삭제
+  - ✅ 역할 정리: 통합 탭=내 포트폴리오 / 둘러보기 탭=소셜(순위·검색·코드로 보기·내 공유물)
+  - ✅ 검증: 단위 68개 + 라이브 스모크 19개 통과
+  - ⬜ 남은 것: 실기기 테스트, RPC 레이트리밋(선택), 1.1.0 통과 후 심사 문서 게시 → 1.2.0/1.3.0 빌드
 
 아래는 v1 첫 배포 당시의 단계별 기록(히스토리)입니다.
 

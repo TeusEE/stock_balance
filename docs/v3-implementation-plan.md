@@ -1,16 +1,15 @@
 # v3 상세 구현 계획 (리비전) — 공유 대시보드 + 순위판 (Supabase)
 
-> 상태: **v3.0 구현 거의 완료** — 데이터 레이어·공유/뷰어 UI·UGC(익명 신고/자동 숨김/비속어 필터/로컬 차단) 완료. 남은 것: 심사 문서 갱신·레이트리밋·실기기 테스트.
+> 상태: **v3.0 + v3.1 구현 완료** (코드/DB). 남은 것: 실기기 테스트 · RPC 레이트리밋(선택) · 1.1.0 통과 후 심사 문서 게시 → 1.2.0/1.3.0 빌드.
 > 작성: 2026-06-09 · **리비전: 2026-06-18** · **진행 갱신: 2026-06-18**
 > 상위 문서: [`roadmap.md`](roadmap.md) · 출시 현황: [`../progress.md`](../progress.md)
 > 선행 조건: **1.1.0 App Store 배포 완료**(v2.0/v2.1 백테스트 포함). v3는 별도 버전으로 진행.
 >
-> **v3.0 진행 현황 요약**
-> - ✅ Supabase 프로젝트 + §4 스키마/RLS/RPC 적용(`pgcrypto` search_path 패치 + `report_shared` 마이그레이션), 라이브 스모크 통과
-> - ✅ 데이터 레이어: `supabase.js` / `shareApi.js` / `AuthContext`(별명+비번) / `shareSerialize` / `nickname` (+테스트)
-> - ✅ UI: `ShareModal` / `SharedViewer` / `ViewSharedModal` + 통합 화면 연결, `App.js` AuthProvider
-> - ✅ UGC 1.2: 익명 신고(`report_shared`)+신고 3건 자동 숨김 · 비속어 필터(`moderation`) · 기기 로컬 차단(`localModeration`) · EULA. (전체 68개 테스트 통과)
-> - ⬜ 처리방침/App Privacy/심사 Notes 갱신 · RPC 레이트리밋 · 실기기 테스트
+> **진행 현황 요약**
+> - ✅ **v3.0**: Supabase 스키마/RLS/RPC(+`pgcrypto`/`report_shared` 패치) · 데이터 레이어(`supabase`/`shareApi`/`AuthContext`/`shareSerialize`/`nickname`) · UI(`ShareModal`/`SharedViewer`/`ViewSharedModal`) · UGC 1.2(익명 신고+자동 숨김·비속어 필터·로컬 차단·EULA) · 심사 문서 초안
+> - ✅ **v3.1**: 둘러보기 탭(`BrowseScreen` — Top5/별명·종목 검색/더보기/차단 필터) · 공개+순위 등재(`submit_return`, backtest.js 재활용, 공유 기본값=공개) · 내 공유물 관리(`MySharesModal`/`list_mine` — 수정/삭제) · 통합↔둘러보기 역할 분리
+> - ✅ 검증: 단위 68개 + 라이브 스모크 19개 통과
+> - ⬜ 실기기 테스트 · RPC 레이트리밋(선택) · 1.1.0 통과 후 심사 문서 라이브 게시 → 1.2.0/1.3.0 빌드
 
 이 문서는 기존 v3 계획을 **방향은 유지(공유 + 순위판)하되 약점을 보완**해 다시 쓴 실행용 계획이다.
 이전 버전(`v2-v3-implementation-plan.md`의 v3 섹션)은 폐기되었다.
@@ -466,10 +465,12 @@ v3부터 수집 신고:
 | `src/components/SharedViewer.js` | v3.0 | ✅ | 읽기전용 뷰어(도넛+리스트, 비중만) |
 | `src/components/ViewSharedModal.js` | v3.0 | ✅ | 공유 코드로 열람 + 신고/차단(구 `SharedDetailScreen` 대체, 모달 방식) |
 | `scripts/check-supabase.js` | v3.0 | ✅ | 라이브 스모크(등록/게시/토큰조회/비번오류/RLS/정리) |
-| `src/screens/BrowseScreen.js` | v3.1 | ⬜ | "둘러보기" 탭: Top5 순위 + 별명/종목 검색 + 더보기(§6-A) |
-| `browse_public` RPC + `shareApi.browsePublic` | v3.1 | ⬜ | 공개 목록 조회(순위/검색/페이지네이션, §6-A) |
-| `submit_return` RPC + `shareApi.submitReturn` | v3.1 | ⬜ | 클라 계산 수익률 제출 + 공개 등재(§6, §6-A) |
-| `ShareModal` "공개로 자랑하기" 옵션 | v3.1 | ⬜ | `backtest.js`로 수익률 계산 → `submitReturn` 제출(§6-A) |
+| `src/screens/BrowseScreen.js` | v3.1 | ✅ | "둘러보기" 탭: Top5 순위 + 별명/종목 검색 + 더보기 + 차단필터(§6-A) |
+| `browse_public` RPC + `shareApi.browsePublic` | v3.1 | ✅ | 공개 목록 조회(순위/검색/페이지네이션, §6-A) |
+| `submit_return` RPC + `shareApi.submitReturn` | v3.1 | ✅ | 클라 계산 수익률 제출 + 공개 등재(§6, §6-A) |
+| `ShareModal` "공개+순위 등재" 옵션(기본값) | v3.1 | ✅ | `backtest.js`로 수익률 계산 → `submitReturn` 제출(§6-A) |
+| `src/components/MySharesModal.js` + `list_mine` RPC | v3.1 | ✅ | 내 공유물 관리: 목록(`listMine`)/제목·공개범위 수정(`updateShared`)/삭제 |
+| `src/components/SharedDetailModal.js` | v3.1 | ✅ | 둘러보기 항목 읽기전용 뷰어 + 신고/차단 |
 | `supabase/functions/recompute-return/` | 차기 | ⬜ | (선택) 위조 차단용 서버 재계산 — 같은 backtest 로직 포팅(§6) |
 
 > 메모: v3.0 은 공유 진입을 별도 탭/스택 대신 **통합 화면의 버튼 + 모달**(`ShareModal`/`ViewSharedModal`)로 구현했다.
@@ -512,10 +513,11 @@ v3부터 수집 신고:
 7. [ ] (선결) RPC 레이트리밋 설정(비번 추측·신고 남용 방지, §2).
 
 **v3.1 ("둘러보기" 탭, 1.3.0)**
-6. `ShareModal` "공개로 자랑하기" → 기존 `backtest.js`로 `return_6m` 계산 → `submit_return` RPC 제출(`visibility='public'`, `on_leaderboard=true`).
-7. `browse_public` + `submit_return` RPC + GIN 인덱스(§6-A) + `shareApi.browsePublic`/`submitReturn` 래퍼.
-8. `BrowseScreen`: ① Top5 순위 · ② 별명 검색 · ③ 종목 검색 · ④ 더보기(+10) · 로컬 차단 필터. 하단 탭 "둘러보기" 추가.
-9. 모더레이션 임계치 조정 + 심사 문서(공개 피드 반영) 갱신 → 1.3.0 제출.
+6. [x] `ShareModal` "공개+순위 등재"(**기본값**) → 기존 `backtest.js`로 `return_6m` 계산 → `submit_return` RPC 제출.
+7. [x] `browse_public` + `submit_return` + `list_mine` RPC + GIN 인덱스(§6-A) + `shareApi` 래퍼(`browsePublic`/`submitReturn`/`listMine`/`updateShared`).
+8. [x] `BrowseScreen`: ① Top5 · ② 별명 검색 · ③ 종목 검색 · ④ 더보기(+10) · 로컬 차단 필터. 하단 탭 "둘러보기" 추가.
+9. [x] 내 공유물 관리(`MySharesModal`): 제목/공개범위 수정·삭제. "코드로 보기"를 둘러보기 탭으로 이동(통합=내 포트폴리오 전용).
+10. [ ] (남음) 모더레이션 임계치 조정 + 심사 문서(공개 피드 반영) 갱신 → 1.3.0 제출 · 실기기 테스트.
 
 ---
 
