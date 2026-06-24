@@ -12,7 +12,7 @@ import {
   View,
 } from 'react-native';
 import { colors, radius, spacing } from '@/theme';
-import { CATEGORIES, DEFAULT_CATEGORY } from '@/constants/categories';
+import { CATEGORIES, DEFAULT_CATEGORY, inferDefaultCategory } from '@/constants/categories';
 import { StockSearchModal } from './StockSearchModal';
 
 export const ItemEditorModal = ({
@@ -51,6 +51,7 @@ export const ItemEditorModal = ({
     setSymbol(q.symbol);
     setPriceInput(q.price != null ? String(q.price) : '');
     setCurrency(q.currency);
+    setCategory(inferDefaultCategory(q));
     setManual(false);
   };
 
