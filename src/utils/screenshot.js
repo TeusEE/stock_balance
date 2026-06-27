@@ -5,7 +5,7 @@
 // 환경변수가 없으면 SCREENSHOT_ENABLED 가 false 라 모든 분기가 무시됩니다.
 //
 // 사용법은 scripts/screenshots.sh 참고. 직접 띄워 보려면:
-//   EXPO_PUBLIC_SCREENSHOT_SCENE=consolidated-group npx expo start
+//   EXPO_PUBLIC_SCREENSHOT_SCENE=browse npx expo start
 
 export const SCENE = process.env.EXPO_PUBLIC_SCREENSHOT_SCENE || null;
 export const SCREENSHOT_ENABLED = !!SCENE;
@@ -13,10 +13,8 @@ export const SCREENSHOT_ENABLED = !!SCENE;
 // 캡처할 씬 목록 (scripts/screenshots.sh 와 동일해야 함)
 export const SCENES = [
   'account',
-  'consolidated-symbol',
-  'consolidated-group',
-  'editor',
-  'usd',
+  'consolidated',
+  'browse',
 ];
 
 const DEMO_ACCOUNT_ID = 'acc_demo_1';
@@ -85,30 +83,104 @@ const SEED_ACCOUNTS = [
 ];
 
 export const SEED_STATE = {
-  activeAccountId: SCENE === 'usd' ? USD_ACCOUNT_ID : DEMO_ACCOUNT_ID,
+  activeAccountId: DEMO_ACCOUNT_ID,
   accounts: SEED_ACCOUNTS,
 };
+
+export const SEED_BROWSE_PORTFOLIOS = [
+  {
+    id: 'share_demo_1',
+    user_id: 'user_demo_1',
+    nickname: '배당든든',
+    title: '월배당 안정형 포트폴리오',
+    base_currency: 'KRW',
+    return_6m: 18.42,
+    holdings: [
+      { name: 'SCHD', symbol: 'SCHD', category: 'dividend', targetPercent: 35 },
+      { name: 'SOL 미국배당다우존스', symbol: '446720.KS', category: 'dividend', targetPercent: 25 },
+      { name: 'KODEX 국고채10년', symbol: '152380.KS', category: 'bond', targetPercent: 25 },
+      { name: '현금', category: 'cash', targetPercent: 15 },
+    ],
+  },
+  {
+    id: 'share_demo_2',
+    user_id: 'user_demo_2',
+    nickname: '장기성장러',
+    title: '미국 빅테크 성장 조합',
+    base_currency: 'KRW',
+    return_6m: 15.77,
+    holdings: [
+      { name: 'TIGER 미국나스닥100', symbol: '133690.KS', category: 'growth', targetPercent: 40 },
+      { name: 'ACE 미국빅테크TOP7', symbol: '465580.KS', category: 'growth', targetPercent: 30 },
+      { name: 'TIGER 미국S&P500', symbol: '360750.KS', category: 'growth', targetPercent: 20 },
+      { name: '현금', category: 'cash', targetPercent: 10 },
+    ],
+  },
+  {
+    id: 'share_demo_3',
+    user_id: 'user_demo_3',
+    nickname: '균형투자자',
+    title: '성장·채권 균형형',
+    base_currency: 'KRW',
+    return_6m: 9.63,
+    holdings: [
+      { name: 'VOO', symbol: 'VOO', category: 'growth', targetPercent: 35 },
+      { name: 'KODEX 종합채권', symbol: '273130.KS', category: 'bond', targetPercent: 30 },
+      { name: 'ACE KRX금현물', symbol: '411060.KS', category: 'physical', targetPercent: 20 },
+      { name: '현금', category: 'cash', targetPercent: 15 },
+    ],
+  },
+  {
+    id: 'share_demo_4',
+    user_id: 'user_demo_4',
+    nickname: '연금준비',
+    title: 'IRP 장기 분산 포트폴리오',
+    base_currency: 'KRW',
+    return_6m: 7.28,
+    holdings: [
+      { name: 'TIGER 미국S&P500', symbol: '360750.KS', category: 'growth', targetPercent: 30 },
+      { name: 'TIGER 리츠부동산인프라', symbol: '329200.KS', category: 'physical', targetPercent: 20 },
+      { name: 'KODEX 국고채10년', symbol: '152380.KS', category: 'bond', targetPercent: 35 },
+      { name: '현금', category: 'cash', targetPercent: 15 },
+    ],
+  },
+  {
+    id: 'share_demo_5',
+    user_id: 'user_demo_5',
+    nickname: '초보분산',
+    title: '처음 시작하는 4종목 분산',
+    base_currency: 'KRW',
+    return_6m: 5.91,
+    holdings: [
+      { name: '삼성전자', symbol: '005930.KS', category: 'growth', targetPercent: 25 },
+      { name: 'TIGER 미국S&P500', symbol: '360750.KS', category: 'growth', targetPercent: 35 },
+      { name: 'KODEX 종합채권', symbol: '273130.KS', category: 'bond', targetPercent: 25 },
+      { name: '현금', category: 'cash', targetPercent: 15 },
+    ],
+  },
+];
 
 // 씬별 화면 상태 -------------------------------------------------------------
 
 // 시작 탭: 통합 화면 씬이면 'Consolidated', 그 외엔 'Accounts'
 export function screenshotInitialTab() {
-  if (SCENE === 'consolidated-symbol' || SCENE === 'consolidated-group') {
+  if (SCENE === 'consolidated') {
     return 'Consolidated';
   }
+  if (SCENE === 'browse') return 'Browse';
   return 'Accounts';
 }
 
 // 통합 화면 보기 모드
 export function screenshotConsolidatedViewMode() {
-  return SCENE === 'consolidated-group' ? 'group' : 'symbol';
+  return 'symbol';
 }
 
 export function screenshotConsolidatedExpanded() {
-  return SCENE === 'consolidated-group' ? { growth: true } : {};
+  return {};
 }
 
 // 계좌 화면에서 '항목 편집' 모달을 펼친 상태로 캡처할지
 export function screenshotEditorOpen() {
-  return SCENE === 'editor';
+  return false;
 }

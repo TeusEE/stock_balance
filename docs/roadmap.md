@@ -1,7 +1,7 @@
 # Roadmap
 
 > 마지막 업데이트: 2026-06-27
-> 현재 앱 버전: **1.2.0** (`app.json` 기준)
+> 현재 앱 버전: **1.2.1** (`app.json` 기준)
 > 관련 문서: [`../README.md`](../README.md) · [`../progress.md`](../progress.md) · [`../CHANGELOG.md`](../CHANGELOG.md)
 
 이 문서는 App Store에 배포하는 **marketing version**을 기준으로 기능 범위를 기록합니다.

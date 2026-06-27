@@ -57,7 +57,7 @@ export async function searchStocks(query) {
   const trimmed = query.trim();
   if (!trimmed) return [];
 
-  const url = `${NAVER_SEARCH_URL}?q=${encodeURIComponent(trimmed)}&target=stock,etf&size=10&page=1`;
+  const url = `${NAVER_SEARCH_URL}?q=${encodeURIComponent(trimmed)}&target=stock&size=10&page=1`;
   const res = await fetch(url, { headers: NAVER_HEADERS });
   if (!res.ok) {
     throw new Error(`Search failed: ${res.status}`);
@@ -102,14 +102,52 @@ function parseChartMeta(data, requestedSymbol) {
   };
 }
 
+function koreanStockCodeFromYahooSymbol(symbol) {
+  const match = /^([0-9A-Z]+)\.(KS|KQ)$/i.exec(String(symbol ?? '').trim());
+  return match ? match[1] : null;
+}
+
+function parseNumberText(value) {
+  if (typeof value === 'number') return value;
+  if (typeof value !== 'string') return null;
+  const n = Number(value.replace(/,/g, '').trim());
+  return Number.isFinite(n) ? n : null;
+}
+
+async function fetchNaverQuote(symbol) {
+  const code = koreanStockCodeFromYahooSymbol(symbol);
+  if (!code) return null;
+  const url = `https://m.stock.naver.com/api/stock/${encodeURIComponent(code)}/basic`;
+  const res = await fetch(url, { headers: NAVER_HEADERS });
+  if (!res.ok) return null;
+  const data = await res.json();
+  const price = parseNumberText(data?.closePrice);
+  if (price == null) return null;
+  return {
+    symbol,
+    shortname: data?.stockName ?? symbol,
+    longname: data?.stockName,
+    exchange: data?.stockExchangeName ?? data?.stockExchangeType?.nameEng,
+    currency: 'KRW',
+    price,
+    marketState: data?.marketStatus,
+  };
+}
+
 async function fetchChartQuote(symbol) {
   const url = `${CHART_URL}/${encodeURIComponent(symbol)}?interval=1d&range=1d`;
-  const res = await fetch(url, { headers: REQUEST_HEADERS });
-  if (!res.ok) {
-    throw new Error(`Quote fetch failed: ${res.status}`);
+  try {
+    const res = await fetch(url, { headers: REQUEST_HEADERS });
+    if (!res.ok) {
+      throw new Error(`Quote fetch failed: ${res.status}`);
+    }
+    const data = await res.json();
+    const quote = parseChartMeta(data, symbol);
+    if (quote) return quote;
+  } catch (e) {
+    if (!koreanStockCodeFromYahooSymbol(symbol)) throw e;
   }
-  const data = await res.json();
-  return parseChartMeta(data, symbol);
+  return fetchNaverQuote(symbol);
 }
 
 /**

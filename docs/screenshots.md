@@ -11,7 +11,7 @@ App Store 제출용 스크린샷을 **데모 데이터로 채워진 화면**에�
 ./scripts/screenshots.sh
 ```
 
-→ `screenshots/01~05-*.png` (1320×2868, App Store 6.9" 필수 규격) 생성.
+→ `screenshots/01~03-*.png` (1320×2868, App Store 6.9" 필수 규격) 생성.
 
 ---
 
@@ -40,8 +40,8 @@ App Store 제출용 스크린샷을 **데모 데이터로 채워진 화면**에�
 ### 특정 씬만 캡처
 
 ```bash
-./scripts/screenshots.sh consolidated-group
-./scripts/screenshots.sh account usd        # 여러 개 지정 가능
+./scripts/screenshots.sh browse
+./scripts/screenshots.sh account consolidated        # 여러 개 지정 가능
 ```
 
 ### 다른 디바이스로 캡처
@@ -76,15 +76,13 @@ xcrun simctl list devices available | grep iPhone
 
 ---
 
-## 캡처되는 5개 씬
+## 캡처되는 3개 씬
 
 | 씬 키 | 출력 파일 | 화면 | 강조 포인트 |
 |---|---|---|---|
-| `account` | `01-account-rebalance.png` | 계좌 리밸런싱 (키움 ISA) | 비중 도넛 100%, 권장 매수 총액, 보유→목표 델타 |
-| `consolidated-symbol` | `02-consolidated-symbol.png` | 통합 · 종목별 | 전 계좌 합산 자산, 종목별 분포 |
-| `consolidated-group` | `03-consolidated-group.png` | 통합 · 그룹별 | 카테고리(성장/배당/채권/실물/현금) 분류 + 범례 |
-| `editor` | `04-item-editor.png` | 항목 편집 모달 | 분류/현재가/보유수량/비중 입력 |
-| `usd` | `05-usd-account.png` | USD 해외주식 계좌 | 달러 표기, VOO 등 |
+| `account` | `01-account-rebalance.png` | 개별계좌 | 계좌별 목표 비중, 권장 매수, 현금 잔액 |
+| `consolidated` | `02-consolidated-account.png` | 종합계좌 | 여러 계좌를 합친 전체 종목 비중과 기준 통화 환산 |
+| `browse` | `03-browse-portfolios.png` | 다른 사람 포트폴리오 구경하기 | 공개 포트폴리오 Top5, 작성자, 대표 종목, 6개월 수익률 |
 
 ---
 
@@ -103,18 +101,19 @@ scripts/screenshots.sh
 화면 상태 매핑은 [`src/utils/screenshot.js`](../src/utils/screenshot.js) 한 곳에 모여 있습니다:
 
 - `SEED_STATE` / `SEED_RATE` — 데모 계좌·종목·환율 시드 데이터
-- `screenshotInitialTab()` — 씬별 시작 탭 (계좌 / 통합)
+- `screenshotInitialTab()` — 씬별 시작 탭 (계좌 / 통합 / 둘러보기)
 - `screenshotConsolidatedViewMode()` / `screenshotConsolidatedExpanded()` — 통합 화면 모드
 - `screenshotEditorOpen()` — 항목 편집 모달 자동 오픈 여부
+- `SEED_BROWSE_PORTFOLIOS` — 둘러보기 탭용 공개 포트폴리오 데모 목록
 
 각 화면 컴포넌트에는 `SCREENSHOT_ENABLED` 가드만 얇게 추가되어 있습니다
-(`PortfolioContext.js`, `AppNavigator.js`, `AccountScreen.js`, `ConsolidatedScreen.js`).
+(`PortfolioContext.js`, `AppNavigator.js`, `AccountScreen.js`, `ConsolidatedScreen.js`, `BrowseScreen.js`).
 스크린샷 모드에서는 시세 자동 새로고침도 꺼져 **시드 가격이 고정**되므로 결과가 항상 동일합니다.
 
 ### 한 화면만 손으로 띄워 보기
 
 ```bash
-EXPO_PUBLIC_SCREENSHOT_SCENE=consolidated-group npx expo start
+EXPO_PUBLIC_SCREENSHOT_SCENE=browse npx expo start
 ```
 
 ---

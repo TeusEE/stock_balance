@@ -1,20 +1,22 @@
-# App Review Information — Notes (paste-ready, 1.2.0)
+# App Review Information — Notes (paste-ready, 1.2.1)
 
 이 파일은 App Store Connect 의 **App Review Information → Notes** 필드에 붙여넣는 영문 원본입니다.
 아래 **코드블록 안의 내용만** 복사해서 Notes 칸에 넣으세요(한글 설명 제외).
 
 > ⚠️ Notes 4000자 제한 — 아래 본문은 약 3,300자라 제한 안에 들어갑니다.
-> ⚠️ **1.2.0 = 선택적 공유(서버 전송) 첫 도입.** 제출 전 ① 처리방침(`privacy-policy.md`, 공유 내용 포함)이 라이브인지,
+> ⚠️ **1.2.1 = 선택적 공유(서버 전송) 포함 빌드.** 제출 전 ① 처리방침(`privacy-policy.md`, 공유 내용 포함)이 라이브인지,
 > ② App Privacy 설문을 아래 가이드대로 갱신했는지 확인하세요.
 
 ---
 
 ```
-ABOUT THIS BUILD (1.2.0)
+ABOUT THIS BUILD (1.2.1)
 This update adds an OPTIONAL portfolio-sharing feature. No in-app purchases, no ads, and no permission prompts (no camera/location/contacts/tracking/notifications). The core app still works fully offline with no account.
 
-1) WHAT'S NEW IN 1.2.0
+1) WHAT'S NEW IN 1.2.1
 An optional "Share Portfolio" feature lets a user publish ONLY their portfolio weights (security name, ticker, category, target %) so others can view them via a share code or in a public "Browse" tab with a 6-month-return ranking. Amounts, owned share counts, current prices, and total assets are NEVER sent.
+
+This build also fixes stock search/price lookup compatibility after upstream API behavior changed: Naver stock search parameters were updated, and Korean ticker price lookup now falls back to Naver when Yahoo Finance blocks .KS/.KQ quote requests.
 
 2) ACCOUNTS / AUTH
 Browsing the app, viewing market data, and viewing shared portfolios require NO login. Only PUBLISHING requires a lightweight account = a self-chosen nickname + password. We do NOT collect email, phone, or any social login (passwords are bcrypt-hashed on our server; we do not use a hosted auth provider). The same nickname+password lets a user manage (edit/delete) their own shares from any device. No email means no reset email.

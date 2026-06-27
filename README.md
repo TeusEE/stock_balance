@@ -34,7 +34,7 @@ iOS(아이폰)와 Android(갤럭시) 모두에서 동작합니다.
   - 계좌 내보내기에는 종목별 권장 매수 수량/예상 매수금액까지 포함됩니다.
 - **6개월 백테스트** (1.1.0) — 현재 포트폴리오 구성을 6개월 전에 그대로 들고 있었다면의 수익률.
   - 계좌별 / 통합 양쪽 모두 지원. Rebalance 카드 아래 / 통합 요약 아래 "6개월 백테스트" 버튼.
-  - 비중 가중 + 종목 자기 통화 기준(환차익 미반영). 결측 종목은 자동 제외 후 비중 재정규화.
+  - 비중 가중 + 종목 자기 통화 기준. 결측 종목은 자동 제외 후 비중 재정규화.
   - 결과는 **모달 캐시**됨 — 모달을 닫았다 다시 열어도 유지, 새로고침 버튼 누를 때만 재조회.
 
 ## 화면 구성
@@ -79,31 +79,29 @@ npx expo start
 App Store 제출용 스크린샷을 **데모 데이터로 채워진 화면**에서 자동 캡처합니다.
 
 ```bash
-./scripts/screenshots.sh                      # 5개 화면 전체 캡처
-./scripts/screenshots.sh consolidated-group   # 특정 씬만
+./scripts/screenshots.sh                      # 3개 화면 전체 캡처
+./scripts/screenshots.sh browse               # 특정 씬만
 DEVICE="iPhone 16 Pro Max" ./scripts/screenshots.sh   # 다른 디바이스
 ```
 
-- 결과물: `screenshots/01~05-*.png` (1320×2868, **App Store 6.9" 필수 규격**)
+- 결과물: `screenshots/01~03-*.png` (1320×2868, **App Store 6.9" 필수 규격**)
 - 앱이 시뮬레이터에 없으면 `expo run:ios`로 자동 빌드 후 캡처합니다 (최초 1회 수 분).
 - 상태바는 9:41 / 풀 배터리·신호로 고정됩니다.
 
-캡처되는 5개 유즈케이스(씬):
+캡처되는 3개 유즈케이스(씬):
 
 | 씬 | 파일 | 내용 |
 |---|---|---|
-| `account` | `01-account-rebalance.png` | 계좌 리밸런싱 — 비중 도넛 + 권장 매수/현금 잔액 + 보유→목표 델타 |
-| `consolidated-symbol` | `02-consolidated-symbol.png` | 통합 종목별 — 전 계좌 합산 자산 분포 |
-| `consolidated-group` | `03-consolidated-group.png` | 통합 그룹별 — 카테고리(성장/배당/채권/실물/현금) 분류 |
-| `editor` | `04-item-editor.png` | 항목 편집 — 분류/현재가/보유수량/비중 입력 |
-| `usd` | `05-usd-account.png` | USD 해외주식 계좌 |
+| `account` | `01-account-rebalance.png` | 개별계좌 — 비중 도넛 + 권장 매수/현금 잔액 + 보유→목표 델타 |
+| `consolidated` | `02-consolidated-account.png` | 종합계좌 — 전 계좌 합산 자산 분포 |
+| `browse` | `03-browse-portfolios.png` | 다른 사람 포트폴리오 구경하기 — 공개 Top5와 6개월 수익률 |
 
 > 화면 상태와 데모 시드 데이터는 모두 [`src/utils/screenshot.js`](src/utils/screenshot.js)에서
 > `EXPO_PUBLIC_SCREENSHOT_SCENE` 환경변수로 제어됩니다. 이 변수가 없으면(=일반 실행/프로덕션 빌드)
 > 시드·씬 로직은 전부 비활성화되어 앱 동작에 **아무 영향이 없습니다**. 직접 한 화면만 띄워 보려면:
 >
 > ```bash
-> EXPO_PUBLIC_SCREENSHOT_SCENE=consolidated-group npx expo start
+> EXPO_PUBLIC_SCREENSHOT_SCENE=browse npx expo start
 > ```
 
 > 자세한 사용법·씬 추가·문제 해결은 [`docs/screenshots.md`](docs/screenshots.md) 참조.

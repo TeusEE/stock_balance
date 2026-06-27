@@ -11,7 +11,7 @@
 # 사용법:
 #   ./scripts/screenshots.sh                # 기본 디바이스로 전체 캡처
 #   DEVICE="iPhone 16 Pro Max" ./scripts/screenshots.sh
-#   ./scripts/screenshots.sh consolidated-group   # 특정 씬만
+#   ./scripts/screenshots.sh browse   # 특정 씬만
 #
 # 요구사항: Xcode + iOS 시뮬레이터, Node, (최초 1회) CocoaPods.
 # ---------------------------------------------------------------------------
@@ -35,7 +35,7 @@ OUT_DIR="${OUT_DIR:-$DEFAULT_OUT_DIR}"
 METRO_LOG="$(mktemp -t stockbalance-metro)"
 
 # 캡처할 씬 목록 (macOS 기본 bash 3.2 호환 위해 연관배열 대신 case 사용)
-SCENES=(account consolidated-symbol consolidated-group editor usd)
+SCENES=(account consolidated browse)
 
 # 인자로 특정 씬만 지정 가능
 if [ "$#" -gt 0 ]; then
@@ -46,15 +46,14 @@ fi
 out_file_for() {
   case "$1" in
     account)              echo "01-account-rebalance.png" ;;
-    consolidated-symbol)  echo "02-consolidated-symbol.png" ;;
-    consolidated-group)   echo "03-consolidated-group.png" ;;
-    editor)               echo "04-item-editor.png" ;;
-    usd)                  echo "05-usd-account.png" ;;
+    consolidated)         echo "02-consolidated-account.png" ;;
+    browse)               echo "03-browse-portfolios.png" ;;
     *)                    echo "${1}.png" ;;
   esac
 }
 
 mkdir -p "$OUT_DIR"
+rm -f "$OUT_DIR"/0*.png
 
 log() { printf '\033[1;36m▶ %s\033[0m\n' "$*"; }
 

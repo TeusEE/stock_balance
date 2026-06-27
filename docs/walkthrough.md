@@ -57,5 +57,5 @@ iOS 가 `.MOV` 로 사진 앱에 저장합니다.
 
 추가하지 않습니다. Apple 은 명시적으로 **physical device** 를 요구하고,
 시뮬레이터 녹화는 거절 사유가 될 수 있습니다. 기존
-`scripts/screenshots.sh` 의 정지 캡처(`screenshots/01~05-*.png`)는
+`scripts/screenshots.sh` 의 정지 캡처(`screenshots/01~03-*.png`)는
 App Store 마케팅 스크린샷용으로만 사용합니다.

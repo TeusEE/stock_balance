@@ -39,6 +39,15 @@ function errorResponse(status) {
   return Promise.resolve({ ok: false, status, json: () => Promise.resolve({}) });
 }
 
+function naverBasicResponse() {
+  return {
+    stockName: '삼성전자',
+    closePrice: '339,500',
+    marketStatus: 'CLOSE',
+    stockExchangeName: 'KOSPI',
+  };
+}
+
 afterEach(() => {
   jest.restoreAllMocks();
 });
@@ -75,6 +84,23 @@ describe('fetchQuotes (삼성전자 현재가 조회)', () => {
 
     expect(result['005930.KS'].price).toBe(307000);
     expect(result['BADSYMBOL']).toBeUndefined();
+  });
+
+  test('한국 종목 Yahoo 조회가 차단되면 네이버 현재가로 보강한다', async () => {
+    global.fetch = jest.fn((url) => {
+      if (String(url).includes('finance.yahoo.com')) return errorResponse(429);
+      if (String(url).includes('m.stock.naver.com/api/stock/005930/basic')) {
+        return okResponse(naverBasicResponse());
+      }
+      return errorResponse(404);
+    });
+
+    const result = await fetchQuotes(['005930.KS']);
+
+    expect(result['005930.KS']).toBeDefined();
+    expect(result['005930.KS'].price).toBe(339500);
+    expect(result['005930.KS'].currency).toBe('KRW');
+    expect(result['005930.KS'].shortname).toBe('삼성전자');
   });
 
   test('빈 배열이면 네트워크 호출 없이 빈 객체를 반환한다', async () => {
@@ -226,6 +252,7 @@ describe('searchStocks (네이버 통합검색)', () => {
     const url = String(global.fetch.mock.calls[0][0]);
     expect(url).toContain('m.stock.naver.com/front-api/search');
     expect(url).toContain(`q=${encodeURIComponent('삼성전자')}`);
+    expect(url).toContain('target=stock');
     expect(url).not.toContain('finance.yahoo.com');
   });
 

@@ -17,6 +17,7 @@ import { getBlockedAuthors } from '@/utils/localModeration';
 import { SharedDetailModal } from '@/components/SharedDetailModal';
 import { MySharesModal } from '@/components/MySharesModal';
 import { ViewSharedModal } from '@/components/ViewSharedModal';
+import { SCREENSHOT_ENABLED, SCENE, SEED_BROWSE_PORTFOLIOS } from '@/utils/screenshot';
 
 const TOP_N = 5; // 요구사항 ①: 상위 5개
 const PAGE = 10; // 요구사항 ④: 더보기 10개씩
@@ -25,7 +26,8 @@ export const BrowseScreen = () => {
   const [mode, setMode] = useState('nickname'); // 'nickname' | 'symbol'
   const [query, setQuery] = useState('');
   const [activeQuery, setActiveQuery] = useState(''); // 실제 적용된 검색어
-  const [items, setItems] = useState([]);
+  const screenshotBrowse = SCREENSHOT_ENABLED && SCENE === 'browse';
+  const [items, setItems] = useState(screenshotBrowse ? SEED_BROWSE_PORTFOLIOS : []);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [hasMore, setHasMore] = useState(false);
@@ -38,6 +40,13 @@ export const BrowseScreen = () => {
 
   const fetchPage = useCallback(
     async (reset, q, searchMode) => {
+      if (screenshotBrowse) {
+        setItems(SEED_BROWSE_PORTFOLIOS);
+        setHasMore(false);
+        setLoading(false);
+        setError(null);
+        return;
+      }
       setLoading(true);
       setError(null);
       try {
@@ -60,16 +69,17 @@ export const BrowseScreen = () => {
         setLoading(false);
       }
     },
-    [],
+    [screenshotBrowse],
   );
 
   // 최초 로드: 차단 목록 먼저 읽고 Top5
   useEffect(() => {
+    if (screenshotBrowse) return;
     (async () => {
       blockedRef.current = new Set(await getBlockedAuthors());
       fetchPage(true, '', 'nickname');
     })();
-  }, [fetchPage]);
+  }, [fetchPage, screenshotBrowse]);
 
   const handleSearch = () => {
     Keyboard.dismiss();
