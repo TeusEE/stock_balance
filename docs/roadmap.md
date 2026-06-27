@@ -1,215 +1,112 @@
-# Roadmap (v2 / v3)
+# Roadmap
 
-> 마지막 업데이트: 2026-06-18
-> 현재 출시 버전: **v1.1.0** (App Store 배포 완료 — v2.0/v2.1 백테스트 포함, [`../progress.md`](../progress.md) 참조)
-> 관련 문서: [`../README.md`](../README.md) · [`ui-wireframe.md`](ui-wireframe.md)
-> v2 구현 기록: [`v2-v3-implementation-plan.md`](v2-v3-implementation-plan.md) · v3 상세 계획: [`v3-implementation-plan.md`](v3-implementation-plan.md)
+> 마지막 업데이트: 2026-06-27
+> 현재 앱 버전: **1.2.0** (`app.json` 기준)
+> 관련 문서: [`../README.md`](../README.md) · [`../progress.md`](../progress.md) · [`../CHANGELOG.md`](../CHANGELOG.md)
 
-이 문서는 v1 이후 구현하고자 하는 기능을 **버전별 개요**로 기록합니다.
-
-> ♻️ **순서 변경 (2026-06-03):** 원래 v2였던 "Supabase 공유 대시보드"와 v3였던 "6개월 백테스트
-> 수익률 / 순위판"의 우선순위를 바꿨습니다. **백테스트 수익률 계산은 서버가 전혀 필요 없는
-> 순수 클라이언트 기능**이라 공유 인프라와 독립적으로 단독 출시할 수 있기 때문입니다.
-> 그래서 **v2 = 6개월 백테스트(로컬 전용)**, **v3 = 공유 대시보드 + 순위판(Supabase)** 으로 재편성했습니다.
-
-> 📋 과거 종가 조회·백테스트 계산·Supabase 스키마·RLS·신규/재사용 파일·검증 방법 등
-> **구체적 구현 단계**는 [`v2-v3-implementation-plan.md`](v2-v3-implementation-plan.md)에 정리되어 있습니다.
+이 문서는 App Store에 배포하는 **marketing version**을 기준으로 기능 범위를 기록합니다.
+각 섹션은 실제 iOS 배포 버전과 해당 버전에 포함된 기능만 기록합니다.
 
 ---
 
-## 🟢 v1 — 로컬 전용 (출시 완료)
+## 1.0.0 — 로컬 전용 (출시 완료)
 
 - 계좌별 포트폴리오 구성 / 목표 비중 / 리밸런싱 권장 매수
 - 전 계좌 통합 뷰 (종목별 / 카테고리별)
 - Yahoo Finance 시세·검색·환율 연동
 - AsyncStorage 로컬 저장, JSON 내보내기
-- **데이터는 전부 기기 내부에만 저장 (서버 전송 없음)**
+- 데이터는 전부 기기 내부에만 저장 (서버 전송 없음)
 
 ---
 
-## 🔵 v2 — 6개월 백테스트 수익률 (로컬 전용, 서버 불필요)
+## 1.1.0 — 6개월 백테스트 (출시 완료)
 
-### 목표
-유저가 **"내 포트폴리오 6개월 백테스트"** 버튼을 누르면, 현재의 포트폴리오 구성(목표 비중)을
-**6개월 전에 그대로 들고 있었다면 발생했을 수익률**을 계산해서 보여준다.
-v1과 마찬가지로 **데이터를 서버로 보내지 않는 순수 클라이언트 기능**이다 (Supabase 불필요).
+### 포함 기능
 
-> 전제: 추가 백엔드 없음. Yahoo Finance `chart` 엔드포인트(`range=6mo&interval=1d`)만 추가로 호출한다.
-
-> 📐 **단계 구성:** **v2.0 기본(보유 수익률)을 먼저** 완성하고(✅ 완료), 그 뒤 같은 차트 데이터를
-> 재활용해 **v2.1 확장(N일 주기 리밸런싱 백테스트)** 을 얹는다(✅ 완료). v2.1은 "N영업일마다 목표
-> 비중으로 되돌렸다면"의 수익률을 보유 대비로 보여주며, 추가 네트워크 호출이 없는 순수 계산 확장이다.
-> ~~마지막으로 **v2.2 에서 환차익(FX)** 까지 반영해 KRW/USD 혼합 포트폴리오의 실제 기준 통화 수익률을
-> 계산한다.~~ → **v2.2(환차익 FX)는 취소됨** (아래 v2.2 섹션 참조).
-
-### 핵심 기능
 | # | 기능 | 메모 |
 |---|---|---|
-| 1 | **과거 시세 조회** | Yahoo `chart`의 `range=6mo&interval=1d` 응답에서 6개월 전 종가 확보 (인증 불필요) |
-| 2 | **6개월 백테스트 수익률 계산** | 각 종목의 6개월 전 종가 대비 현재가로 **비중 가중** 수익률 산출 |
-| 3 | **"6개월 백테스트" 버튼 → 상세 모달** | 총 수익률 + 종목별 수익률 내역 + 제외 종목 경고 표시 |
-| 4 | **계좌 + 통합 둘 다 지원** | 계좌 화면(해당 계좌 비중) / 통합 화면(전 계좌 합산 비중) 모두 |
-| 5 | **결측·제외 처리 규칙** | 심볼 없는 항목(수동/현금)·상장 6개월 미만·조회 실패 종목 제외 후 비중 재정규화 |
+| 1 | 과거 시세 조회 | Yahoo `chart`의 `range=6mo&interval=1d` 응답에서 일별 종가 확보 |
+| 2 | 6개월 보유 백테스트 | 현재 포트폴리오 구성을 6개월 전에 그대로 들고 있었다면의 비중 가중 수익률 |
+| 3 | N영업일 리밸런싱 백테스트 | 보유 / 매주 / 매월 / 매분기 모드 비교 |
+| 4 | 계좌 + 통합 지원 | 계좌 화면과 통합 화면 모두 지원 |
+| 5 | 결측·제외 처리 | 심볼 없음, 상장 6개월 미만, 조회 실패 종목 제외 후 비중 재정규화 |
 
 ### 수익률 계산 모델
+
+```text
+종목 수익률       = (현재종가 - 6개월전 종가) / 6개월전 종가
+정규화 비중       = 종목비중 / 제외 안 된 종목들의 비중 합
+포트폴리오 수익률 = Σ(정규화비중_i × 종목수익률_i) × 100
 ```
-종목 수익률    = (현재종가 − 6개월전_종가) / 6개월전_종가      (종목 자기 통화 기준)
-정규화 비중    = 종목비중 / (제외 안 된 종목들의 비중 합)
-포트폴리오 수익률 = Σ (정규화비중_i × 종목수익률_i) × 100  (%)
-```
-- **비중 가중** 방식: 계좌는 v1 목표 비중(`targetPercent`), 통합은 합산 비중을 가중치로 사용.
-- **통화/금액 불필요**: 각 종목의 % 수익률은 통화 무관(dimensionless)이라 환율 환산·보유수량·금액이
-  필요 없다. → MVP에서 **환차익은 미반영**(향후 과제).
-- **결측 처리**: 6개월 시세가 없는 종목은 제외하고 **남은 비중을 재정규화** + "N개 종목 제외" 경고.
 
-### 확정된 결정 (→ [구현 계획](v2-v3-implementation-plan.md#v2--6개월-백테스트-수익률))
-- **계산 위치**: **클라이언트 계산** — 앱이 직접 계산해 화면에 표시(서버 전송 없음).
-- **기간**: 6개월 고정(MVP). 다기간 선택은 향후 과제.
-- **통화**: v2.0/v2.1 은 종목 자기 통화 기준(환차익 제외). **v2.2 에서 환차익 포함**으로 확장.
+- 계산 위치: 클라이언트
+- 기준: 종목 자기 통화 기준
+- 기간: 6개월 고정
+- 배당, 거래비용, 세금은 미반영
 
-### 아키텍처 변화 / 기술 고려사항
-- **신규 코드**:
-  - `src/services/stockApi.js`에 **과거 종가 조회 함수**(`fetchHistoricalClose` / `fetchHistoricalCloses`) 추가
-    (`chart` 호출에 `range`/`interval` 노출 — 엔드포인트는 이미 동일).
-  - `src/utils/backtest.js`(신규) — 비중 가중 수익률 계산 (테스트는 `__tests__`에 추가).
-  - `src/components/BacktestModal.js`(신규) — 결과 상세 모달.
-- **백엔드 변화 없음** — v1과 동일하게 로컬 전용. App Store "데이터 미수집" 선언 **유지**.
-- **기존 코드 재사용**:
-  - `src/services/stockApi.js`의 `parseChartMeta`/`fetchQuotes`(병렬·부분실패) 패턴 — 과거 시세 파싱 확장
-  - `src/utils/aggregate.js`의 `aggregateAcrossAccounts` — 통합 백테스트 비중 가중치
-  - `src/utils/format.js`의 `formatPercent` — 수익률 % 포맷
-  - `src/components/ExportButtons.js`/`ItemEditorModal.js` — 버튼/모달 스타일 패턴
+### 구현 메모
 
-> 🔧 `fetchHistoricalClose`/`backtest.js` 설계·결과 모달·검증 방법은
-> [구현 계획의 v2 섹션](v2-v3-implementation-plan.md#v2--6개월-백테스트-수익률) 참조.
+- 주요 코드:
+  - `src/services/stockApi.js`: `fetchHistoricalClose`, `fetchHistoricalCloses`
+  - `src/utils/backtest.js`: 비중 빌드, 시계열 정렬, 보유/리밸런싱 시뮬레이션
+  - `src/components/BacktestModal.js`: 보유/매주/매월/매분기 결과 표시
+  - `src/screens/AccountScreen.js`, `src/screens/ConsolidatedScreen.js`: 백테스트 실행 연결
+- 검증:
+  - `src/utils/__tests__/backtest.test.js`
+  - `src/services/__tests__/stockApi.test.js`
+  - `npm run test:live:backtest`
 
 ---
 
-## ⛔ v2.2 — 환차익(FX) 포함 백테스트 — **취소됨 (2026-06-09)**
+## 1.2.0 — 공유 + 둘러보기 + 순위 (구현 완료, 배포 준비)
 
-> 이 기능은 **구현하지 않기로 결정**했다. 아래 설계 내용은 참고용으로만 남겨둔다.
-> (각 종목의 % 수익률은 통화 무관이라 백테스트 자체는 동작하며, 환차익 반영은
->  복잡도 대비 우선순위가 낮다고 판단.)
+### 포함 기능
 
-### 목표 (취소된 설계)
-KRW 계좌에 담긴 USD ETF(예: VOO)나, USD 계좌에 담긴 KRW ETF 같은 **혼합 통화 포트폴리오**에서
-실제 사용자가 경험한 **기준 통화 환산 수익률**을 보여준다. v2.0/v2.1 은 각 종목을 자기 통화로만
-계산해서 "달러로 +10% 났지만 원/달러가 -5% 빠졌다면 KRW 기준은 거의 본전" 같은 현실을 못 잡아낸다.
-v2.2 는 이 차이를 메운다.
-
-### 결합 수익률 모델
-```
-종목수익률_local = (endClose − startClose) / startClose          # 자기 통화 (v2.0)
-fx_return       = (endFXRate − startFXRate) / startFXRate       # 종목통화 → base 환율 변화
-종목수익률_base = (1 + 종목수익률_local) × (1 + fx_return) − 1   # 결합
-```
-
-- **기준 통화(base)**: 계좌 화면은 `activeAccount.currency`, 통합 화면은 헤더의 KRW/USD 토글값 그대로.
-- **FX 데이터**: `{종목통화}{base}=X` 심볼 (예: `USDKRW=X`, `KRWUSD=X`). 기존 `fetchHistoricalClose`
-  를 **그대로 재사용** — 새 함수·새 엔드포인트 없음.
-- **통화 일치 시**: `fx_return = 0` → v2.0 결과와 동일.
-- **FX 결측**: 해당 종목은 **제외 + 경고** (`no-fx-data` 사유). 부정확한 폴백보다 신호가 명확함.
-
-### 핵심 기능
 | # | 기능 | 메모 |
 |---|---|---|
-| 1 | **base currency 자동 결정** | 계좌 화면=계좌 통화, 통합 화면=헤더 토글 그대로 |
-| 2 | **FX 시리즈 병렬 조회** | unique non-base currencies → `{cur}{base}=X` 심볼로 `fetchHistoricalCloses` |
-| 3 | **결합 수익률 계산** | `computeBacktest` 옵션 확장 — `baseCurrency`, `fxMap` 주입 |
-| 4 | **모달에 기준 통화 표시** | "6개월 보유 수익률 (KRW 기준)" 같이 라벨링 |
-| 5 | **FX 결측 종목 경고** | `excluded` 에 `reason: 'no-fx-data'` 로 분리 표기 |
+| 1 | Supabase 연동 | `@supabase/supabase-js`, RLS, RPC |
+| 2 | 별명+비밀번호 인증 | Supabase Auth 미사용, 앱 테이블에 bcrypt 해시 저장 |
+| 3 | 포트폴리오 공유 | 비중(%)만 서버 전송, 금액·보유수량·현재가는 전송하지 않음 |
+| 4 | 공유 코드 뷰어 | `share_token`으로 읽기 전용 조회 |
+| 5 | 둘러보기 탭 | 공개 포트폴리오 Top5, 별명 검색, 종목 검색, 더보기 |
+| 6 | 순위 등재 | 6개월 백테스트 수익률 기준 정렬 |
+| 7 | 내 공유물 관리 | 제목/공개범위 수정, 삭제 |
+| 8 | UGC 대응 | EULA, 신고, 자동 숨김, 로컬 차단, 비속어 필터 |
 
-### 확정된 결정 (→ [구현 계획](v2-v3-implementation-plan.md#v22--환차익fx-포함-백테스트))
-- **결측 처리**: FX 시리즈 결측 종목은 **제외** (자기 통화 폴백 X).
-- **계산 위치**: 계속 클라이언트. 서버 전송 없음.
-- **API 변경 0**: 기존 `fetchHistoricalClose` 가 FX 심볼도 그대로 받음.
-- **하위 호환**: `computeBacktest` 의 새 옵션은 모두 선택적 — 기존 호출(=v2.0) 동작 그대로 유지.
+### 확정된 결정
 
-### 아키텍처 변화 / 기술 고려사항
-- **신규 코드**: 없음 (모듈 추가 없음). `src/utils/backtest.js` 의 `computeBacktest` 시그니처에
-  `{ baseCurrency, fxMap }` 옵션 추가.
-- **재사용**:
-  - `src/services/stockApi.js`의 `fetchHistoricalClose(s)` — FX 심볼도 동일 패턴으로 호출.
-  - 두 화면의 `runBacktest` — symbols 와 함께 unique non-base currencies 도 계산해 한 번의
-    `Promise.all` 로 같이 가져온다.
-  - 통합 화면 헤더의 `base` toggle — base currency 입력원으로 재사용.
-- **MVP 유지 한계**: 배당·거래비용 미반영, 6개월 고정.
+- 공유 범위: 종목명, 심볼, 카테고리, 목표 비중만 전송
+- 읽기: 로그인 불필요
+- 쓰기/관리: 별명+비밀번호를 RPC에 전달해 소유권 검증
+- 순위 수익률: 현재 앱에서 6개월 백테스트를 계산해 `submit_return` RPC로 제출
 
-> 🔧 옵션 시그니처·결측 정책·테스트 케이스는
-> [구현 계획의 v2.2 섹션](v2-v3-implementation-plan.md#v22--환차익fx-포함-백테스트) 참조.
+### 구현 메모
 
----
+- 주요 코드:
+  - `src/services/supabase.js`: Supabase anon 클라이언트, Supabase Auth 세션 미사용
+  - `src/services/shareApi.js`: `publishPortfolio`, `getSharedByToken`, `browsePublic`, `submitReturn`, `listMine`, `updateShared`, `unpublishPortfolio`, `reportShared`
+  - `src/context/AuthContext.js`: 별명+비밀번호 등록/검증
+  - `src/utils/shareSerialize.js`: 비중만 추출, 금액/수량/현재가 제외
+  - `src/utils/moderation.js`, `src/utils/localModeration.js`: 금칙어, 로컬 신고/차단 상태
+  - `src/components/ShareModal.js`, `src/components/ViewSharedModal.js`, `src/components/SharedViewer.js`, `src/components/MySharesModal.js`, `src/components/SharedDetailModal.js`
+  - `src/screens/BrowseScreen.js`
+  - `src/navigation/AppNavigator.js`: `둘러보기` 탭
+- Supabase 구성:
+  - `app_users`: 별명, bcrypt 비밀번호 해시
+  - `shared_portfolios`: 공유 포트폴리오, 공개범위, 공유 토큰, 수익률, 숨김 상태
+  - `reports`: 익명 신고 및 누적 자동 숨김
+  - 주요 RPC: `auth_nickname`, `publish_portfolio`, `update_portfolio`, `unpublish_portfolio`, `get_shared_by_token`, `report_shared`, `browse_public`, `submit_return`, `list_mine`
+- 검증:
+  - `src/utils/__tests__/shareSerialize.test.js`
+  - `src/services/__tests__/shareApi.test.js`
+  - `src/utils/__tests__/nickname.test.js`
+  - `src/utils/__tests__/moderation.test.js`
+  - `scripts/check-supabase.js`
 
-## 🟣 v3 — 포트폴리오 공유 대시보드 + 순위판 (Supabase)
+## 배포 전 남은 운영 작업
 
-> 📘 **상세 실행 계획(리비전, 2026-06-18): [`v3-implementation-plan.md`](v3-implementation-plan.md)** —
-> 방향(공유+순위판)은 유지하되 약점을 보완: ① 인증 = **별명+비밀번호 자체 저장**(Supabase Auth·이메일 미사용, 읽기는 로그인 불필요),
-> ② **2단계 출시**(v3.0 공유/뷰어 → v3.1 공개피드/순위판)로 심사 표면 축소,
-> ③ 순위판 수익률 **서버(Edge Function) 재계산**으로 조작 차단. 정확한 RLS·RPC SQL, UGC(1.2) 대응 포함.
-
-### 목표
-유저가 자신의 포트폴리오를 **남들과 공유**할 수 있는 공유 대시보드를 제공하고,
-v2에서 계산한 **6개월 백테스트 수익률을 기준으로 순위를 매겨** 우수 포트폴리오를 자랑할 수 있는
-**순위판(리더보드)** 을 운영한다. 백엔드는 **Supabase**(Postgres + Auth + RLS)를 사용한다.
-
-> 전제: v2의 백테스트 계산 위에서 동작한다. "자랑하기"는 v2에서 계산한 수익률을 공유와 함께 제출한다.
-
-### 핵심 기능
-| # | 기능 | 메모 |
-|---|---|---|
-| 1 | **Supabase 연동 기반 구축** | 프로젝트 생성, `@supabase/supabase-js` 도입, 익명 로그인 + 닉네임 |
-| 2 | **포트폴리오 업로드(공유)** | 로컬 포트폴리오를 Supabase에 게시 → 공유 가능한 상태로 전환 |
-| 3 | **공유 대시보드 화면** | 남들이 공개한 포트폴리오를 탐색/조회하는 신규 탭(화면) |
-| 4 | **공유 링크 / 공개 범위** | 비공개·링크 공개·전체 공개 등 가시성 제어 (RLS 정책으로 보장) |
-| 5 | **읽기 전용 뷰어** | 공유된 포트폴리오를 v1의 통합 뷰(도넛/리스트)로 렌더 (편집 불가) |
-| 6 | **순위판(리더보드)** | v2 백테스트 수익률 기준 정렬, 상위 포트폴리오 노출 |
-| 7 | **"포트폴리오 자랑하기" 버튼** | v2에서 계산된 수익률과 함께 포트폴리오를 순위판에 제출 |
-
-### 확정된 결정 (리비전 2026-06-18 → [상세 계획](v3-implementation-plan.md))
-- **인증**: **Supabase Auth 미사용** — 별명+비밀번호를 우리 테이블(`app_users`)에 **직접 저장**(bcrypt 해시).
-  읽기는 로그인 불필요, 쓰기는 RPC가 별명+비번 검증. 같은 별명+비번으로 어느 기기서나 소유권 증명 → 영속.
-  (이전 "익명 전용"은 데이터 소실, "이메일 OTP/GoTrue"는 불필요로 폐기. 비번 해시·레이트리밋은 자체 책임, 분실 복구는 차기.)
-- **공유 범위**: **비중(%)만 공유** — 총 금액(`totalAmount`)·보유수량·현재가는 서버로 보내지 않음. (유지)
-- **출시 단계**: **v3.0**(공유/링크/읽기전용 뷰어) → **v3.1**(공개 피드 + 순위판)로 분리해 심사 리스크 축소.
-- **순위판 수익률**: **서버(Edge Function) 재계산**으로 저장 → 클라이언트 위조 차단. (이전 "클라 제출"에서 변경.)
-
-### 아키텍처 변화 / 기술 고려사항
-- **신규 의존성**: `@supabase/supabase-js`, `react-native-url-polyfill`.
-- **데이터 모델**: 로컬 `state`에서 **종목+비중만** 추출해 공유 스키마로 직렬화. 순위판용
-  `return_6m`/`return_computed_at`/`on_leaderboard` 컬럼.
-- **보안**: Row Level Security(RLS)로 "본인 것만 쓰기, 공개분만 읽기" 강제.
-- **프라이버시 / 심사**: v1·v2는 "데이터 미수집"이지만, **v3에서 서버 전송이 시작**되므로
-  **개인정보 처리방침·데이터 수집 설문을 반드시 갱신**해야 함.
-- **기존 코드 재사용**:
-  - `src/utils/aggregate.js` — 공유 뷰의 통합/카테고리 합산 로직
-  - `src/components/DonutChart.js`, `src/screens/ConsolidatedScreen.js` — 읽기 전용 뷰어로 재활용
-  - `src/context/PortfolioContext.js` — 로컬 상태 직렬화 형식의 단일 출처
-  - `src/utils/backtest.js` (v2) — 자랑하기 제출 시 수익률 재사용
-
-> 🔧 테이블 정의(`profiles`, `shared_portfolios`)·RLS 정책·신규 파일·화면 흐름·순위판은
-> [구현 계획의 v3 섹션](v2-v3-implementation-plan.md#v3--공유-대시보드--순위판) 참조.
-
----
-
-## 📌 버전 간 의존 관계
-```
-v1 (로컬)                                     ✅ 출시 (1.0.0)
- └─ v2.0 (보유 백테스트, 로컬)               ✅ 완료 → 1.1.0 출시
-     └─ v2.1 (N일 리밸런싱, 같은 시리즈 재계산)  ✅ 완료 → 1.1.0 출시
-         └─ v2.2 (환차익 FX 포함)                  ⛔ 취소
-             └─ v3 (방향 재검토 중 — 아래 v3 섹션 / v3-implementation-plan.md 참조)
-```
-
-> **v1.1.0 출시 완료(2026-06-18):** v2.0·v2.1 백테스트가 1.1.0 빌드에 포함되어 App Store에 배포됨.
-> v2.2(환차익)는 취소되어 미포함. v3는 리비전 진행 중.
-
-## ⚠️ 공통 선결 과제
-**v2 진입 전 (백테스트)** — 별도 백엔드 선결 없음. Yahoo `chart` 과거 시세 조회만 추가.
-(v2.2 환차익 FX 는 취소됨.)
-
-**v3 진입 전 (공유 + 순위판)**
-- 개인정보 처리방침 / App Store 데이터 수집 설문 갱신 (이 시점부터 서버 전송 시작)
-- Supabase 환경변수·키 관리 (`app.json` extra / EAS secrets)
-- ~~공유 시 노출 범위 프라이버시 정책 확정~~ → **비중(%)만 공유**로 결정됨
-
-> 단계별 작업 순서·검증 방법은 [구현 계획 문서](v2-v3-implementation-plan.md#구현-순서-권장)를 따르세요.
+- App Store Connect App Privacy 설문을 1.2.0 기준으로 갱신
+- GitHub Pages의 `privacy-policy.md`가 공유 전송 데이터 포함 버전으로 게시되어 있는지 확인
+- EAS production 빌드 및 제출
+- TestFlight/실기기에서 공유, 코드 열람, 둘러보기, 신고/차단, 내 공유물 관리를 확인
+- RPC 레이트리밋은 보안 강화 과제로 별도 추적
